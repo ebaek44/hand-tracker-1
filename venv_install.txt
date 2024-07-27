@@ -1,7 +1,7 @@
 Venv Install Instructions
 
 1. Clone Repo
-git clone https://github.com/your-username/your-repo.git
+git clone https://github.com/ebaek44/hand-tracker-1.git
 cd your-repo
 
 2. Create/activate Venv
