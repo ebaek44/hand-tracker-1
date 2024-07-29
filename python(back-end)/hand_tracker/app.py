@@ -4,6 +4,7 @@ import csv
 import copy
 import argparse
 import itertools
+import time
 from collections import Counter
 from collections import deque
 
@@ -11,15 +12,16 @@ import cv2 as cv
 import numpy as np
 import mediapipe as mp
 
-from utils import CvFpsCalc
-from model import KeyPointClassifier
-from model import PointHistoryClassifier
+from hand_tracker.utils import CvFpsCalc
+from hand_tracker.model import KeyPointClassifier
+from hand_tracker.model import PointHistoryClassifier
+from shared_data import GestureData
 
 
 def get_args():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--device", type=int, default=0)
+    parser.add_argument("--device", type=int, default=1)
     parser.add_argument("--width", help='cap width', type=int, default=960)
     parser.add_argument("--height", help='cap height', type=int, default=540)
 
@@ -38,7 +40,7 @@ def get_args():
     return args
 
 
-def main():
+def hand_tracker(gesture_data: GestureData):
     # Argument parsing #################################################################
     args = get_args()
 
@@ -71,14 +73,14 @@ def main():
     point_history_classifier = PointHistoryClassifier()
 
     # Read labels ###########################################################
-    with open('model/keypoint_classifier/keypoint_classifier_label.csv',
+    with open('/Users/ethanbaek/Desktop/Hand Tracker/python(back-end)/hand_tracker/model/keypoint_classifier/keypoint_classifier_label.csv',
               encoding='utf-8-sig') as f:
         keypoint_classifier_labels = csv.reader(f)
         keypoint_classifier_labels = [
             row[0] for row in keypoint_classifier_labels
         ]
     with open(
-            'model/point_history_classifier/point_history_classifier_label.csv',
+            '/Users/ethanbaek/Desktop/Hand Tracker/python(back-end)/hand_tracker/model/point_history_classifier/point_history_classifier_label.csv',
             encoding='utf-8-sig') as f:
         point_history_classifier_labels = csv.reader(f)
         point_history_classifier_labels = [
@@ -97,6 +99,9 @@ def main():
 
     #  ########################################################################
     mode = 0
+    current_gesture_id = None
+    gesture_start_time = None
+    gesture_duration = 0
 
     while True:
         fps = cvFpsCalc.get()
@@ -157,7 +162,22 @@ def main():
                 finger_gesture_history.append(finger_gesture_id)
                 most_common_fg_id = Counter(
                     finger_gesture_history).most_common()
+                
+                # Update Gesture ids
+                gesture_data.update_gesture(hand_sign_id, gesture_duration, most_common_fg_id[0][0])
 
+                # Update gesture duration
+                if current_gesture_id != gesture_data.gesture_id:
+                    current_gesture_id = gesture_data.gesture_id
+                    gesture_start_time = time.time()
+                    gesture_duration = 0
+                else:
+                    gesture_duration = time.time() - gesture_start_time
+
+                # Update the shared gesture duration
+                gesture_data.update_gesture(current_gesture_id, gesture_duration, most_common_fg_id[0][0])
+
+                
                 # Drawing part
                 debug_image = draw_bounding_rect(use_brect, debug_image, brect)
                 debug_image = draw_landmarks(debug_image, landmark_list)
@@ -168,6 +188,9 @@ def main():
                     keypoint_classifier_labels[hand_sign_id],
                     point_history_classifier_labels[most_common_fg_id[0][0]],
                 )
+
+                print(hand_sign_id)
+
         else:
             point_history.append([0, 0])
 
@@ -179,6 +202,7 @@ def main():
 
     cap.release()
     cv.destroyAllWindows()
+
 
 
 def select_mode(key, mode):
@@ -282,12 +306,12 @@ def logging_csv(number, mode, landmark_list, point_history_list):
     if mode == 0:
         pass
     if mode == 1 and (0 <= number <= 9):
-        csv_path = 'model/keypoint_classifier/keypoint.csv'
+        csv_path = '/Users/ethanbaek/Desktop/Hand Tracker/python(back-end)/hand_tracker/model/keypoint_classifier/keypoint.csv'
         with open(csv_path, 'a', newline="") as f:
             writer = csv.writer(f)
             writer.writerow([number, *landmark_list])
     if mode == 2 and (0 <= number <= 9):
-        csv_path = 'model/point_history_classifier/point_history.csv'
+        csv_path = '/Users/ethanbaek/Desktop/Hand Tracker/python(back-end)/hand_tracker/model/point_history_classifier/point_history.csv'
         with open(csv_path, 'a', newline="") as f:
             writer = csv.writer(f)
             writer.writerow([number, *point_history_list])
@@ -539,5 +563,5 @@ def draw_info(image, fps, mode, number):
     return image
 
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    hand_tracker(2)
