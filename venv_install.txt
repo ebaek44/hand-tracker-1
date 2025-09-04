@@ -8,5 +8,5 @@ cd your-repo
 python3 -m venv venv
 source venv/bin/activate
 
-3. Install all dependencies
-pip install -r requirements.txt
+3. Install all dependencies (depending on if you are on a mac vs other device)
+pip install -e ".[apple]" or ".[cpu]"

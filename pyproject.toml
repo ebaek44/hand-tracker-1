@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hand-tracker"
+version = "0.1.0"
+description = "Hand gesture tracker with MediaPipe + TensorFlow, Flask overlay via Socket.IO"
+requires-python = ">=3.10"
+
+dependencies = [
+  # Web server + websockets
+  "Flask==3.0.3",
+  "Flask-SocketIO==5.3.6",
+  "python-socketio==5.11.3",
+  "eventlet==0.36.1",
+
+  # CV + ML
+  # Allow pip to choose a compatible mediapipe for your Python/OS
+  "mediapipe>=0.10,<0.11",
+  "opencv-python==4.10.0.84",
+  "numpy==1.26.4",
+  "pandas==2.2.2",
+  "scikit-learn==1.5.1",
+
+  # Utils
+  "requests==2.32.3",
+]
+
+[project.optional-dependencies]
+# Choose exactly one of these at install time:
+apple = ["tensorflow-macos==2.16.1"]
+cpu   = ["tensorflow==2.16.1"]
+
+# Optional dev tools
+notebooks = [
+  "notebook>=7.2",
+  "ipykernel>=6.29.5",
+  "ipywidgets>=8.1.3",
+  "jupyterlab>=4.2",
+]
+viz = [
+  "matplotlib==3.9.1",
+  "seaborn==0.13.2",
+]
+dev = [
+  "black>=24.3.0",
+  "ruff>=0.4.0",
+  "pytest>=8.2.0",
+]
+
+[tool.setuptools]
+packages = { find = { where = ["."] } }
+
+[tool.setuptools.package-data]
+hand_tracker = [
+  "model/**/*.keras",
+  "model/**/*.tflite",
+  "model/**/*.csv"
+]

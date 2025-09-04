@@ -1,9 +1,13 @@
 # gesture_data_handler
 import json
 import requests
-
+import time
+import threading
 
 class GestureHandler:
+    """
+    Created a thread-safe gesture state & emitter
+    """
     def __init__(self) -> None:
         self._gesture_id = None
         self._gesture_duration = 0

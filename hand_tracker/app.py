@@ -15,35 +15,43 @@ import mediapipe as mp
 from hand_tracker.utils import CvFpsCalc
 from hand_tracker.model import KeyPointClassifier
 from hand_tracker.model import PointHistoryClassifier
-from ..handlers.gesture_data_handler import GestureHandler
+from handlers.gesture_data_handler import GestureHandler
 
+from importlib import resources
 
+# This will parse the command line args
 def get_args():
     parser = argparse.ArgumentParser()
+    # what device to use for the camera
+    parser.add_argument("--device", type=int, default=0)
 
-    parser.add_argument("--device", type=int, default=1)
+    # resolution capture
     parser.add_argument("--width", help='cap width', type=int, default=960)
     parser.add_argument("--height", help='cap height', type=int, default=540)
 
+    # if true it will run full detection every frame
     parser.add_argument('--use_static_image_mode', action='store_true')
+
+    # thresholds for media pipe
     parser.add_argument("--min_detection_confidence",
                         help='min_detection_confidence',
                         type=float,
                         default=0.7)
     parser.add_argument("--min_tracking_confidence",
                         help='min_tracking_confidence',
-                        type=int,
+                        type=float,
                         default=0.5)
 
     args = parser.parse_args()
 
     return args
 
-
+# main loop for tracking the hand
 def hand_tracker(gesture_data: GestureHandler):
     # Argument parsing #################################################################
     args = get_args()
 
+    # opens camera
     cap_device = args.device
     cap_width = args.width
     cap_height = args.height
@@ -56,6 +64,8 @@ def hand_tracker(gesture_data: GestureHandler):
 
     # Camera preparation ###############################################################
     cap = cv.VideoCapture(cap_device)
+    if not cap.isOpened():
+        raise RuntimeError(f"Could not open camera device {cap_device}")
     cap.set(cv.CAP_PROP_FRAME_WIDTH, cap_width)
     cap.set(cv.CAP_PROP_FRAME_HEIGHT, cap_height)
 
@@ -72,20 +82,25 @@ def hand_tracker(gesture_data: GestureHandler):
 
     point_history_classifier = PointHistoryClassifier()
 
+    # Warm-up the model to avoid first-frame latency
+    try:
+        dummy_kp = [0.0] * 42        # 21 keypoints * 2
+        _ = keypoint_classifier(dummy_kp)
+
+        dummy_hist = [0.0] * 32      # history_length(16) * 2
+        _ = point_history_classifier(dummy_hist)
+    except Exception as e:
+        print("Warm-up failed (not fatal):", e)
     # Read labels ###########################################################
-    with open('/Users/ethanbaek/Desktop/Hand Tracker/python(back-end)/hand_tracker/model/keypoint_classifier/keypoint_classifier_label.csv',
-              encoding='utf-8-sig') as f:
-        keypoint_classifier_labels = csv.reader(f)
-        keypoint_classifier_labels = [
-            row[0] for row in keypoint_classifier_labels
-        ]
-    with open(
-            '/Users/ethanbaek/Desktop/Hand Tracker/python(back-end)/hand_tracker/model/point_history_classifier/point_history_classifier_label.csv',
-            encoding='utf-8-sig') as f:
-        point_history_classifier_labels = csv.reader(f)
-        point_history_classifier_labels = [
-            row[0] for row in point_history_classifier_labels
-        ]
+    with resources.files("hand_tracker.model.keypoint_classifier") \
+            .joinpath("keypoint_classifier_label.csv") \
+            .open("r", encoding="utf-8-sig") as f:
+        keypoint_classifier_labels = [row[0] for row in csv.reader(f)]
+
+    with resources.files("hand_tracker.model.point_history_classifier") \
+            .joinpath("point_history_classifier_label.csv") \
+            .open("r", encoding="utf-8-sig") as f:
+        point_history_classifier_labels = [row[0] for row in csv.reader(f)]
 
     # FPS Measurement ########################################################
     cvFpsCalc = CvFpsCalc(buffer_len=10)
@@ -102,12 +117,13 @@ def hand_tracker(gesture_data: GestureHandler):
     current_gesture_id = None
     gesture_start_time = None
     gesture_duration = 0
-
+    
+    frame_i = 0
     while True:
         fps = cvFpsCalc.get()
 
         # Process Key (ESC: end) #################################################
-        key = cv.waitKey(10)
+        key = cv.waitKey(1)
         if key == 27:  # ESC
             break
         number, mode = select_mode(key, mode)
@@ -116,6 +132,11 @@ def hand_tracker(gesture_data: GestureHandler):
         ret, image = cap.read()
         if not ret:
             break
+        
+        frame_i += 1
+        # this will skip frames to help with latency (you can tweak if even more)
+        if frame_i % 2 == 1:
+            continue
         image = cv.flip(image, 1)  # Mirror display
         debug_image = copy.deepcopy(image)
 
@@ -164,18 +185,18 @@ def hand_tracker(gesture_data: GestureHandler):
                     finger_gesture_history).most_common()
                 
                 # Update Gesture ids
-                gesture_data.update_gesture(hand_sign_id, gesture_duration, most_common_fg_id[0][0])
+                candidate_id = hand_sign_id
 
                 # Update gesture duration
-                if current_gesture_id != gesture_data.gesture_id():
-                    current_gesture_id = gesture_data.gesture_id()
+                if current_gesture_id != candidate_id:
+                    current_gesture_id = candidate_id
                     gesture_start_time = time.time()
-                    gesture_duration = 0
+                    gesture_duration = 0.0
                 else:
                     gesture_duration = time.time() - gesture_start_time
 
                 # Update the shared gesture duration
-                gesture_data.update_gesture(current_gesture_id, gesture_duration, most_common_fg_id[0][0])
+                gesture_data.update_gesture(hand_sign_id, gesture_duration, most_common_fg_id[0][0])
                 gesture_data.process_gesture()
 
                 
@@ -203,7 +224,7 @@ def hand_tracker(gesture_data: GestureHandler):
     cv.destroyAllWindows()
 
 
-
+# maps keyboard input to logging mode
 def select_mode(key, mode):
     number = -1
     if 48 <= key <= 57:  # 0 ~ 9
@@ -216,7 +237,7 @@ def select_mode(key, mode):
         mode = 2
     return number, mode
 
-
+# calculates a bound rectangle with mediapipe landmarks in image pixels
 def calc_bounding_rect(image, landmarks):
     image_width, image_height = image.shape[1], image.shape[0]
 
@@ -234,7 +255,7 @@ def calc_bounding_rect(image, landmarks):
 
     return [x, y, x + w, y + h]
 
-
+# converts mediapipes normalized landmarks to pixel coordinates
 def calc_landmark_list(image, landmarks):
     image_width, image_height = image.shape[1], image.shape[0]
 
@@ -250,7 +271,7 @@ def calc_landmark_list(image, landmarks):
 
     return landmark_point
 
-
+# Prepares a feature vector
 def pre_process_landmark(landmark_list):
     temp_landmark_list = copy.deepcopy(landmark_list)
 
@@ -277,7 +298,7 @@ def pre_process_landmark(landmark_list):
 
     return temp_landmark_list
 
-
+# builds a sequence feature
 def pre_process_point_history(image, point_history):
     image_width, image_height = image.shape[1], image.shape[0]
 
@@ -300,8 +321,10 @@ def pre_process_point_history(image, point_history):
 
     return temp_point_history
 
-
+# when in mode 1 or 2 and 0-9 is pressed it will log the feature
 def logging_csv(number, mode, landmark_list, point_history_list):
+    # if we want to log we can turn this on
+    """
     if mode == 0:
         pass
     if mode == 1 and (0 <= number <= 9):
@@ -315,8 +338,9 @@ def logging_csv(number, mode, landmark_list, point_history_list):
             writer = csv.writer(f)
             writer.writerow([number, *point_history_list])
     return
-
-
+    """
+    return
+# draws the hand skeleton
 def draw_landmarks(image, landmark_point):
     if len(landmark_point) > 0:
         # Thumb
@@ -513,7 +537,7 @@ def draw_bounding_rect(use_brect, image, brect):
 
     return image
 
-
+# tells you the handedness and the hand sign
 def draw_info_text(image, brect, handedness, hand_sign_text,
                    finger_gesture_text):
     cv.rectangle(image, (brect[0], brect[1]), (brect[2], brect[1] - 22),
@@ -534,7 +558,7 @@ def draw_info_text(image, brect, handedness, hand_sign_text,
 
     return image
 
-
+# motion trail drawer
 def draw_point_history(image, point_history):
     for index, point in enumerate(point_history):
         if point[0] != 0 and point[1] != 0:
@@ -543,7 +567,7 @@ def draw_point_history(image, point_history):
 
     return image
 
-
+# draws fps and curr logging mode/number label
 def draw_info(image, fps, mode, number):
     cv.putText(image, "FPS:" + str(fps), (10, 30), cv.FONT_HERSHEY_SIMPLEX,
                1.0, (0, 0, 0), 4, cv.LINE_AA)
