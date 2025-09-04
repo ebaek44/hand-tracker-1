@@ -2,19 +2,23 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 import tensorflow as tf
-
+from importlib import resources
 
 class PointHistoryClassifier(object):
     def __init__(
         self,
-        model_path='/Users/ethanbaek/Desktop/Hand Tracker/python(back-end)/hand_tracker/model/point_history_classifier/point_history_classifier.tflite',
         score_th=0.5,
         invalid_value=0,
         num_threads=1,
     ):
-        self.interpreter = tf.lite.Interpreter(model_path=model_path,
-                                               num_threads=num_threads)
-
+        with resources.as_file(
+            resources.files("hand_tracker.model.point_history_classifier")
+                     .joinpath("point_history_classifier.tflite")
+        ) as model_file:
+            self.interpreter = tf.lite.Interpreter(
+                model_path=str(model_file),
+                num_threads=num_threads
+            )
         self.interpreter.allocate_tensors()
         self.input_details = self.interpreter.get_input_details()
         self.output_details = self.interpreter.get_output_details()

@@ -91,6 +91,7 @@ def hand_tracker(gesture_data: GestureHandler):
         _ = point_history_classifier(dummy_hist)
     except Exception as e:
         print("Warm-up failed (not fatal):", e)
+
     # Read labels ###########################################################
     with resources.files("hand_tracker.model.keypoint_classifier") \
             .joinpath("keypoint_classifier_label.csv") \
@@ -118,7 +119,18 @@ def hand_tracker(gesture_data: GestureHandler):
     gesture_start_time = None
     gesture_duration = 0
     
+    # for stability of the finger movement
+    stable_fg_id = 0
+    fg_candidate_id = 0
+    streak = 0
+    K = 7
+
+    lock_dir = 0 # last confirmed direction
+    lock_until = 0.0 # timestamp until opposite flips are ignored
+    LOCKOUT_SECS = 0.5 # change this for how long you want lockout
+
     frame_i = 0
+    # main loop for the camera
     while True:
         fps = cvFpsCalc.get()
 
@@ -161,6 +173,7 @@ def hand_tracker(gesture_data: GestureHandler):
                     landmark_list)
                 pre_processed_point_history_list = pre_process_point_history(
                     debug_image, point_history)
+                
                 # Write to the dataset file
                 logging_csv(number, mode, pre_processed_landmark_list,
                             pre_processed_point_history_list)
@@ -177,13 +190,38 @@ def hand_tracker(gesture_data: GestureHandler):
                 point_history_len = len(pre_processed_point_history_list)
                 if point_history_len == (history_length * 2):
                     finger_gesture_id = point_history_classifier(
-                        pre_processed_point_history_list)
+                        pre_processed_point_history_list
+                    )
 
-                # Calculates the gesture IDs in the latest detection
-                finger_gesture_history.append(finger_gesture_id)
-                most_common_fg_id = Counter(
-                    finger_gesture_history).most_common()
+                fg_candidate_id = finger_gesture_id
+                # ---- Lockout check ----
+                now = time.time()
+                if now < lock_until:
+                    if (fg_candidate_id == 1 and lock_dir == -1) or (fg_candidate_id == 2 and lock_dir == +1):
+                        # Opposite direction during lock → override to STOP
+                        fg_candidate_id = 0  
                 
+                # --- Consecutive-frame stabilization ---
+
+                if fg_candidate_id == finger_gesture_id:
+                    streak = min(streak + 1, 10_000)
+                else:
+                    streak = 1
+
+                if fg_candidate_id != stable_fg_id and streak >= K:
+                    stable_fg_id = fg_candidate_id
+                    # Set lock direction (+1 for right, -1 for left, 0 for stop)
+                    if stable_fg_id == 1:   # right
+                        lock_dir = +1
+                        lock_until = time.time() + LOCKOUT_SECS
+                    elif stable_fg_id == 2: # left
+                        lock_dir = -1
+                        lock_until = time.time() + LOCKOUT_SECS
+                    else:
+                        lock_dir = 0
+                
+                final_fg_id = stable_fg_id
+            
                 # Update Gesture ids
                 candidate_id = hand_sign_id
 
@@ -196,7 +234,7 @@ def hand_tracker(gesture_data: GestureHandler):
                     gesture_duration = time.time() - gesture_start_time
 
                 # Update the shared gesture duration
-                gesture_data.update_gesture(hand_sign_id, gesture_duration, most_common_fg_id[0][0])
+                gesture_data.update_gesture(hand_sign_id, gesture_duration, final_fg_id)
                 gesture_data.process_gesture()
 
                 
@@ -208,11 +246,13 @@ def hand_tracker(gesture_data: GestureHandler):
                     brect,
                     handedness,
                     keypoint_classifier_labels[hand_sign_id],
-                    point_history_classifier_labels[most_common_fg_id[0][0]],
+                    point_history_classifier_labels[final_fg_id],
                 )
 
         else:
             point_history.append([0, 0])
+            finger_gesture_history.clear()
+            pointer_id = 0
 
         debug_image = draw_point_history(debug_image, point_history)
         debug_image = draw_info(debug_image, fps, mode, number)
@@ -585,3 +625,23 @@ def draw_info(image, fps, mode, number):
                        cv.LINE_AA)
     return image
 
+
+# QUICK TESTING
+class PrintGestureHandler:
+    def __init__(self):
+        self._last = None
+
+    def update_gesture(self, hand_id, duration, pointer_id):
+        # keep API compatible; nothing to do here
+        self._last = (hand_id, pointer_id, duration)
+
+    def process_gesture(self):
+        # print occasionally so you see changes
+        if self._last:
+            hand_id, pointer_id, duration = self._last
+            print(f"[TEST] hand_id={hand_id} pointer_id={pointer_id} dur={duration:.2f}s")
+        return None
+
+if __name__ == "__main__":
+    handler = PrintGestureHandler()
+    hand_tracker(handler)
