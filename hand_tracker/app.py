@@ -46,6 +46,28 @@ def get_args():
 
     return args
 
+# helper fnction to see how long it takes
+def total_dx(points, n=16):
+    """
+    Returns (dx, run_len) where run_len is the length of the trailing
+    contiguous run of non-zero points, capped at n.
+    dx is last.x - first.x over that trailing run.
+    """
+    seq = list(points)
+    run = []
+    for p in reversed(seq):
+        if p and p != [0, 0]:
+            run.append(p)
+            if len(run) >= n:
+                break
+        elif run:
+            # we already started a run, stop when we hit the first zero
+            break
+    run = list(reversed(run))
+    if len(run) < 2:
+        return 0.0, len(run)
+    return float(run[-1][0] - run[0][0]), len(run)
+
 # main loop for tracking the hand
 def hand_tracker(gesture_data: GestureHandler):
     # Argument parsing #################################################################
@@ -122,12 +144,13 @@ def hand_tracker(gesture_data: GestureHandler):
     # for stability of the finger movement
     stable_fg_id = 0
     fg_candidate_id = 0
+    prev_fg_candidate_id = -1
     streak = 0
-    K = 7
-
+    K = 4
+    D_MIN_PX = max(int(0.12 * cap_width), 60)
     lock_dir = 0 # last confirmed direction
     lock_until = 0.0 # timestamp until opposite flips are ignored
-    LOCKOUT_SECS = 0.5 # change this for how long you want lockout
+    LOCKOUT_SECS = 2.0 # change this for how long you want lockout
 
     frame_i = 0
     # main loop for the camera
@@ -149,6 +172,7 @@ def hand_tracker(gesture_data: GestureHandler):
         # this will skip frames to help with latency (you can tweak if even more)
         if frame_i % 2 == 1:
             continue
+        
         image = cv.flip(image, 1)  # Mirror display
         debug_image = copy.deepcopy(image)
 
@@ -165,6 +189,12 @@ def hand_tracker(gesture_data: GestureHandler):
                                                   results.multi_handedness):
                 # Bounding box calculation
                 brect = calc_bounding_rect(debug_image, hand_landmarks)
+
+                # calculate the minimum pixel travel by the 
+                bx1, by1, bx2, by2 = brect
+                box_w = max(1, bx2 - bx1)
+                # move this up if too sensitive and down if not sensitive enough
+                D_MIN_PX = max(int(0.30 * box_w), 20)
                 # Landmark calculation
                 landmark_list = calc_landmark_list(debug_image, hand_landmarks)
 
@@ -203,22 +233,44 @@ def hand_tracker(gesture_data: GestureHandler):
                 
                 # --- Consecutive-frame stabilization ---
 
-                if fg_candidate_id == finger_gesture_id:
+                # has to be pointer hand_sign
+                is_pointing = (hand_sign_id == 2)
+                moving_horiz = (fg_candidate_id in (1, 2))
+                if not is_pointing:
+                    fg_candidate_id = 0
+                
+                dx, run_len = total_dx(point_history, n = history_length)
+                has_run = run_len >= 4
+                has_disp = abs(dx) >= D_MIN_PX and has_run
+
+                cand_bin = 1 if (is_pointing and moving_horiz) else 0
+
+                if fg_candidate_id == prev_fg_candidate_id:
                     streak = min(streak + 1, 10_000)
                 else:
                     streak = 1
+                prev_fg_candidate_id = cand_bin
+                                
+                # determine direction purely from dx sign (screen coords after cv.flip: dx>0 = right)
+                dir_sign = 0
+                if has_disp:
+                    if dx > 0:
+                        dir_sign = +1   # right
+                    elif dx < 0:
+                        dir_sign = -1   # left
+            
+                if not is_pointing:
+                    stable_fg_id = 0
+                    lock_dir = 0
+                    lock_until = 0.0
+                    streak = 0
 
-                if fg_candidate_id != stable_fg_id and streak >= K:
-                    stable_fg_id = fg_candidate_id
-                    # Set lock direction (+1 for right, -1 for left, 0 for stop)
-                    if stable_fg_id == 1:   # right
-                        lock_dir = +1
-                        lock_until = time.time() + LOCKOUT_SECS
-                    elif stable_fg_id == 2: # left
-                        lock_dir = -1
-                        lock_until = time.time() + LOCKOUT_SECS
-                    else:
-                        lock_dir = 0
+                else:
+                    # confirm swipe when pointing, moving horizontally, streak >= K, and we have a direction
+                    if cand_bin == 1 and dir_sign != 0 and streak >= K:
+                        stable_fg_id = 1 if dir_sign == +1 else 2  # 1=right, 2=left (UI-friendly mapping)
+                        lock_dir = dir_sign
+                        lock_until = now + LOCKOUT_SECS
                 
                 final_fg_id = stable_fg_id
             
@@ -232,7 +284,7 @@ def hand_tracker(gesture_data: GestureHandler):
                     gesture_duration = 0.0
                 else:
                     gesture_duration = time.time() - gesture_start_time
-
+                
                 # Update the shared gesture duration
                 gesture_data.update_gesture(hand_sign_id, gesture_duration, final_fg_id)
                 gesture_data.process_gesture()
@@ -363,23 +415,20 @@ def pre_process_point_history(image, point_history):
 
 # when in mode 1 or 2 and 0-9 is pressed it will log the feature
 def logging_csv(number, mode, landmark_list, point_history_list):
-    # if we want to log we can turn this on
-    """
     if mode == 0:
         pass
     if mode == 1 and (0 <= number <= 9):
-        csv_path = '/Users/ethanbaek/Desktop/Hand Tracker/python(back-end)/hand_tracker/model/keypoint_classifier/keypoint.csv'
+        csv_path = '/Users/ethanbaek/Documents/Projects/hand-tracker-1/hand_tracker/model/keypoint_classifier/keypoint.csv'
         with open(csv_path, 'a', newline="") as f:
             writer = csv.writer(f)
             writer.writerow([number, *landmark_list])
     if mode == 2 and (0 <= number <= 9):
-        csv_path = '/Users/ethanbaek/Desktop/Hand Tracker/python(back-end)/hand_tracker/model/point_history_classifier/point_history.csv'
+        csv_path = '/Users/ethanbaek/Documents/Projects/hand-tracker-1/hand_tracker/model/point_history_classifier/point_history.csv'
         with open(csv_path, 'a', newline="") as f:
             writer = csv.writer(f)
             writer.writerow([number, *point_history_list])
     return
-    """
-    return
+
 # draws the hand skeleton
 def draw_landmarks(image, landmark_point):
     if len(landmark_point) > 0:
@@ -625,7 +674,9 @@ def draw_info(image, fps, mode, number):
                        cv.LINE_AA)
     return image
 
-
+# ====== IF WE WANT TO TRAIN MORE DATA UN-COMMENT THIS SECTION AND RUN IT ========
+# NOTE: key h will be logging point history and key k will be logging gesture history
+"""
 # QUICK TESTING
 class PrintGestureHandler:
     def __init__(self):
@@ -645,3 +696,4 @@ class PrintGestureHandler:
 if __name__ == "__main__":
     handler = PrintGestureHandler()
     hand_tracker(handler)
+"""
