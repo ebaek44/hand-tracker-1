@@ -1,50 +1,46 @@
-from flask import Flask, request, jsonify
-from flask_socketio import SocketIO
+# server.py
+import signal
+import sys
+import time
+
 from handlers.gesture_data_handler import GestureHandler
+from hand_tracker.app import hand_tracker  # wherever your function lives
 
-app = Flask(__name__)
-socketio = SocketIO(app)
-gesture_handler = GestureHandler()
+RUN_SOCKET_URL = "http://localhost:3000"  # must match your Next.js server
+RUN_NAMESPACE = "/gestures"
 
+def main():
+    handler = GestureHandler(
+        sio_url=RUN_SOCKET_URL,
+        sio_namespace=RUN_NAMESPACE,
+        burst_window=0.25,
+        swipe_cooldown=1.5,
+        lockout_secs=1.0,
+        sign_dwell=0.35,
+        control_cooldown=1.0,
+        loop_hz=90.0,
+        emit_event="gesture",
+    )
 
-@app.route('api/gesture', methods=["POST"])
-def handle_gesture():
-    data = request.json
-    hand_id = data.get('hand_id')
-    duration = data.get('duration')
-    pointer_id = data.get('pointer_id')
-
-    gesture_handler.update_gesture(hand_id, duration, pointer_id)
-    response = gesture_handler.process_gesture()
-
-    if response:
-        socketio.emit('gesture_data', response)
-        return jsonify({"status": "success", "data": response})
-    else:
-        return jsonify({"status": "failure", "message": "Gesture duration less than 3"}), 400
+    handler.start()
     
+    # Graceful shutdown on SIGTERM from Node
+    def _shutdown(_sig, _frm):
+        print("[server.py] shutting down...")
+        handler.close()
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
+    
+    # Run the hand tracker loop (blocks until user quits)
+    try:
+        hand_tracker(handler)
+    finally:
+        handler.close()
+        # small delay to flush any final emits
+        time.sleep(0.1)
+
 
 if __name__ == "__main__":
-    socketio.run(app, debug=True)
-
-"""
-Add to frontend
-<!-- Add this to your HTML file -->
-<script src="/socket.io/socket.io.js"></script>
-<script>
-  const socket = io('http://localhost:5000');
-
-  socket.on('gesture_data', (data) => {
-    console.log('Received gesture data:', data);
-    // Handle the received data and update the UI
-  });
-</script>
-
-### Make sure to look at how to change it to be in react js format (it is in html format rn)
-"""
-
-"""
-NEXT STEPS
-See if I need to make the change from using https requests between the flask server and the hand_tracker 
-function to using socketio and then find out how to simoutanoesly run the hand_tracker and the flask server
-"""
+    main()

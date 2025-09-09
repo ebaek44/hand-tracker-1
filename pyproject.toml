@@ -53,6 +53,8 @@ dev = [
 packages = { find = { where = ["."] } }
 
 [tool.setuptools.package-data]
+"hand_tracker.model.keypoint_classifier" = ["*.tflite", "*.csv"]
+"hand_tracker.model.point_history_classifier" = ["*.tflite", "*.csv"]
 hand_tracker = [
   "model/**/*.keras",
   "model/**/*.tflite",

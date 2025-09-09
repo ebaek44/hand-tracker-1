@@ -1,14 +1,22 @@
-# Node
-node_modules/
-
 # Python
-.venv/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.dist/
+build/
+dist/
+.venv/
+.env
 
-# Jupyter
-.ipynb_checkpoints/
+# Node
+node_modules/
+npm-debug.log*
+yarn.lock # (only if you don't want it)
+pnpm-lock.yaml
 
-# OS / Editor
+# OS/editor
 .DS_Store
+.idea/
 .vscode/
