@@ -119,7 +119,7 @@ function broadcastGesture(payload) {
     console.log(`[Hands-On/bg] Broadcasting gesture to ${tabs.length} tab(s)`);
   });
 }
-// lifecycle
+// Lifecycle
 chrome.runtime.onStartup.addListener(() => startPolling());
 chrome.runtime.onInstalled.addListener(() => startPolling());
 chrome.runtime.onSuspend.addListener(() => stopPolling(true));

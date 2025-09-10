@@ -67,7 +67,7 @@
 
   connect();
 
-  // Reestablish visibility
+  // Re-establish visibility
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && !state.heartbeatId && !state.port) {
       connect();

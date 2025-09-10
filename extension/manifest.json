@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Hands-On Video Controls",
+  "name": "Hands On Video Controls",
   "version": "1.0.0",
   "description": "Control any site's videos with hand gestures from a local helper.",
   "icons": { "128": "icon128.png" },

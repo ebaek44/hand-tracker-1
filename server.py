@@ -51,7 +51,7 @@ def main():
     )
     handler.start()
 
-    # Run tracker headless in a thread (for training, run app.py directly)
+    # run tracker headless in a thread (for training, run app.py directly)
     Thread(target=hand_tracker, args=(handler,), daemon=True).start()
 
     def _shutdown(_sig, _frm):

@@ -110,7 +110,7 @@ class GestureHandler:
 
             self._prune_recent(now)
 
-            # if its to toggle play and pause then we do that with priority (returns the payload to emniut)
+            # If its to toggle play and pause then we do that with priority (returns the payload to emniut)
             if hand_id in self.TOGGLE_PLAY_PAUSE:
                 payload = self._maybe_emit_control(now, dur, hand_id)
                 

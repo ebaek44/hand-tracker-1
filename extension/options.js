@@ -1,4 +1,4 @@
-// options.js 
+//  options.js 
 const $ = (id) => document.getElementById(id);
 chrome.storage.sync.get(
   { gestureUrl:  "http://localhost:3000", gestureNs: "/gestures" },

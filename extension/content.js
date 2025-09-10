@@ -63,7 +63,7 @@
     } catch {}
   }
 
-  // Debounce bursts
+  // debounce bursts
   let lastAction = { key: '', ts: 0 };
   function shouldAct(key, ms = 120) {
     const now = Date.now();
