@@ -3,15 +3,28 @@
   "name": "Hands-On Video Controls",
   "version": "1.0.0",
   "description": "Control any site's videos with hand gestures from a local helper.",
-  "icons": { "128": "icons/128.png" },
-  "permissions": ["storage"],
-  "host_permissions": ["http://localhost:3000/*"],
-  "content_scripts": [{
+  "icons": { "128": "icon128.png" },
+  "permissions": ["storage", "tabs"],
+  "host_permissions": [
+    "http://localhost:3333/*",
+    "http://127.0.0.1:3333/*",
+    "<all_urls>"
+  ],
+  "background": { 
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+  {
     "matches": ["<all_urls>"],
-    "js": ["socket.io.min.js", "content.js"],
+    "js": ["keepalive.js"],
     "run_at": "document_idle",
-    "all_frames": true
-  }],
-  "options_page": "options.html"
+    "all_frames": false 
+  },
+  {
+    "matches": ["<all_urls>"],
+    "js": ["content.js"],
+    "run_at": "document_idle",
+    "all_frames": true 
+  }
+]
 }
-  

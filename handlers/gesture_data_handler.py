@@ -1,9 +1,8 @@
 # gesture_data_handler
 import time
 import threading
-import socketio
 from collections import deque, Counter
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Callable
 
 class GestureHandler:
     """
@@ -16,8 +15,7 @@ class GestureHandler:
     TOGGLE_PLAY_PAUSE = {0}
     def __init__(
             self, 
-            sio_url: str = "http://localhost:3000",
-            sio_namespace: Optional[str] = "/gestures",
+            emit_fn: Callable[[dict], None],
             burst_window: float = 0.25,   # seconds for swipe majority
             swipe_cooldown: float = 0.35, # min gap between swipe emits
             lockout_secs: float = 0.30,   # block immediate opposite after a swipe
@@ -53,18 +51,15 @@ class GestureHandler:
         self.control_cooldown = control_cooldown
         self.loop_dt = 1.0 / float(loop_hz)
         self.emit_event = emit_event
-        self.sio_namespace = sio_namespace
 
         self._lock = threading.RLock()
         self._stop = threading.Event()
         self._worker: Optional[threading.Thread] = None
 
-        self._sio = socketio.Client(reconnection=True)
-        try:
-            self._sio.connect(sio_url, wait=False, namespaces=[sio_namespace] if sio_namespace else None)
-            print("[GestureHandler] Socket.IO connected")
-        except Exception as e:
-            print(f"[GestureHandler] Socket.IO connect failed: {e}")
+        if emit_fn is None:
+            raise ValueError("emit_fn is required in server mode")
+        self.emit_fn = emit_fn
+
         
     # ----- Public API -----
 
@@ -82,11 +77,6 @@ class GestureHandler:
         if self._worker:
             self._worker.join(timeout=timeout)
         
-        try:
-            if self._sio.connected:
-                self._sio.disconnect()
-        except Exception:
-            pass
         
     
 
@@ -197,12 +187,9 @@ class GestureHandler:
     # ---- Emission to Front End -----
 
     def _emit(self, data: dict) -> None:
-        # Will try to emit to frontend
+        # Will try to emit to front end
         try:
-            if self._sio.connected:
-                self._sio.emit(self.emit_event, data, namespace=self.sio_namespace)
-            else:
-                print("[GestureHandler] (offline) would emit:", data)
+            self.emit_fn(data) 
         except Exception as e:
             print("[GestureHandler] emit failed:", e)
 

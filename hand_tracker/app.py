@@ -19,6 +19,10 @@ from handlers.gesture_data_handler import GestureHandler
 
 from importlib import resources
 
+import os
+SHOW_UI = os.environ.get("HAND_TRACKER_UI", "0") == "1"
+# SHOW_UI = True
+
 # This will parse the command line args
 def get_args():
     parser = argparse.ArgumentParser()
@@ -158,7 +162,7 @@ def hand_tracker(gesture_data: GestureHandler):
         fps = cvFpsCalc.get()
 
         # Process Key (ESC: end) #################################################
-        key = cv.waitKey(1)
+        key = cv.waitKey(1) if SHOW_UI else -1
         if key == 27:  # ESC
             break
         number, mode = select_mode(key, mode)
@@ -245,7 +249,7 @@ def hand_tracker(gesture_data: GestureHandler):
 
                 cand_bin = 1 if (is_pointing and moving_horiz) else 0
 
-                if fg_candidate_id == prev_fg_candidate_id:
+                if cand_bin == prev_fg_candidate_id:
                     streak = min(streak + 1, 10_000)
                 else:
                     streak = 1
@@ -310,10 +314,12 @@ def hand_tracker(gesture_data: GestureHandler):
         debug_image = draw_info(debug_image, fps, mode, number)
 
         # Screen reflection #############################################################
-        cv.imshow('Hand Gesture Recognition', debug_image)
+        if SHOW_UI:
+            cv.imshow('Hand Gesture Recognition', debug_image)
 
     cap.release()
-    cv.destroyAllWindows()
+    if SHOW_UI:
+        cv.destroyAllWindows()
 
 
 # maps keyboard input to logging mode
@@ -677,7 +683,6 @@ def draw_info(image, fps, mode, number):
 # ====== IF WE WANT TO TRAIN MORE DATA UN-COMMENT THIS SECTION AND RUN IT ========
 # NOTE: key h will be logging point history and key k will be logging gesture history
 """
-# QUICK TESTING
 class PrintGestureHandler:
     def __init__(self):
         self._last = None
