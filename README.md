@@ -10,7 +10,7 @@ Control online videos with **hand gestures**. A native server (MediaPipe + OpenC
 
 - [Server (macOS/Linux)](https://github.com/ebaek44/hand-tracker-1/releases/tag/Releases/download/v1.0.0/gesture-server-macos-arm64.zip)
 - [Server (Windows)](Not available yet)
-- [Chrome extension (ZIP)](https://github.com/ebaek44/hand-tracker-1/releases/download/v1.0.0/extension.zip)
+- [Chrome extension (ZIP)](https://github.com/ebaek44/hand-tracker-1/releases/tag/Releases/download/v1.0.0/extension.zip)
 
 ---
 
