@@ -10,7 +10,7 @@ Control online videos with **hand gestures**. A native server (MediaPipe + OpenC
 > Use **Latest** links if you want the README to always point to your newest release,
 > or **Tagged** links if you want a specific version.
 
-**Specific tag (e.g., v1.0.0):**
+**Device Specific Download:**
 
 - Server (macOS/Linux):  
   `https://github.com/ebaek44/hand-tracker-1/releases/download/v1.0.0/gesture-server`
