@@ -12,6 +12,9 @@ dist/
 
 # Node
 node_modules/
+test-results/
+playwright-report/
+training/output/
 npm-debug.log*
 yarn.lock # (only if you don't want it)
 pnpm-lock.yaml

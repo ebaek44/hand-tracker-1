@@ -1,0 +1,19 @@
+{
+  "name": "hands-on-video-controls",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare:extension": "node scripts/prepare-extension.mjs",
+    "reset:training-baseline": "node scripts/reset-training-baseline.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:browser": "playwright test",
+    "check": "node scripts/check.mjs"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "0.10.32"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.0"
+  }
+}

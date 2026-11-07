@@ -1,126 +1,90 @@
-// background.js
-// This is our background worker that is polling for gestures sent from the backend using the localhost
-// This will whisper to content.js which will execute the command
-let polling = false;
-let pollTimer = null;
-let pollController = null;
-let backoffMs = 1000;
+// Event-driven broker only. The offscreen page owns camera and inference;
+// Manifest V3 service-worker suspension cannot interrupt the tracking loop.
+const offscreenUrl = chrome.runtime.getURL('offscreen.html');
+let creation;
+let transition = Promise.resolve();
+let routing = false;
+let routeGeneration = 0;
 
-// Function to start polling
-async function startPolling() {
-  if (polling) {
-    console.log('[Hands-On/bg] Already polling');
-    return;
-  }
+async function hasTracker() {
+  return (await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'], documentUrls: [offscreenUrl] })).length > 0;
+}
+async function ensureTracker() {
+  if (await hasTracker()) return;
+  creation ??= chrome.offscreen.createDocument({
+    url: 'offscreen.html', reasons: ['USER_MEDIA', 'WORKERS'],
+    justification: 'Capture the user-approved camera and classify hand gestures locally in a worker.'
+  }).finally(() => { creation = undefined; });
+  await creation;
+}
+const trackerMessage = action => chrome.runtime.sendMessage({ target: 'tracker', action });
 
-  // Read settings
-  const settings = await chrome.storage.sync.get({
-    gestureUrl: "http://localhost:3333",
-    gestureNs: "/gestures",
-  });
-  const pollUrl = `${settings.gestureUrl}/poll-gestures`;
-  const healthUrl = `${settings.gestureUrl}/health`;
-  console.log('[Hands-On/bg] Starting HTTP polling to', pollUrl);
-
-  // Quick health check (not needed but good for debugging)
+async function routeGesture(payload) {
+  if (routing) return;
+  routing = true;
+  const current = routeGeneration;
   try {
-    const r = await fetch(healthUrl, { method: 'GET', headers: { 'Accept': 'application/json' }, cache: 'no-store' });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const health = await r.json();
-    console.log('[Hands-On/bg] Server health check:', health);
-  } catch (e) {
-    console.warn('[Hands-On/bg] Server not reachable:', e?.message || e);
-    scheduleRestart(); 
+    const window = await chrome.windows.getLastFocused();
+    if (!window.focused) return;
+    const [tab] = await chrome.tabs.query({ active: true, windowId: window.id });
+    if (!tab?.id || !/^https?:/.test(tab.url ?? '')) return;
+    // Injection is idempotent. Scan only on an actual gesture, never on a timer.
+    await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ['content.js'] });
+    const candidates = await chrome.scripting.executeScript({
+      target: { tabId: tab.id, allFrames: true },
+      func: () => globalThis.__handsOnController?.probe() ?? null,
+    });
+    const best = candidates.filter(c => c.result).sort((a, b) => b.result.score - a.result.score)[0];
+    if (!best) {
+      await chrome.runtime.sendMessage({ target: 'tracker', action: 'feedback', feedback: { error: 'No visible, ready video found' } });
+      return;
+    }
+    const [active] = await chrome.tabs.query({ active: true, windowId: window.id });
+    const focused = await chrome.windows.getLastFocused();
+    if (current !== routeGeneration || active?.id !== tab.id || focused.id !== window.id || !focused.focused) return;
+    const result = await chrome.tabs.sendMessage(tab.id,
+      { kind: 'hands-on/gesture', payload, token: best.result.token }, { frameId: best.frameId });
+    await chrome.runtime.sendMessage({ target: 'tracker', action: 'feedback', feedback: result });
+  } catch (error) {
+    console.debug('[Hands On] Video unavailable:', error.message);
+  } finally { routing = false; }
+}
+
+chrome.runtime.onMessage.addListener((message, sender, respond) => {
+  if (sender.id !== chrome.runtime.id || !sender.url?.startsWith(chrome.runtime.getURL(''))) return;
+  if (message?.target !== 'background') return;
+  const fromTracker = sender.url === offscreenUrl;
+  if (message.action === 'gesture' && fromTracker) {
+    void routeGesture(message.payload);
     return;
   }
-
-  // Arm polling
-  polling = true;
-  backoffMs = 1000; // reset backoff on success
-  pollController = new AbortController();
-
-  const tick = async () => {
-    if (!polling) return;
-
-    // snapshot the controller to avoid the null .signal race
-    const ctrl = pollController;
-    if (!ctrl || ctrl.signal.aborted) return;
-
-    try {
-      const resp = await fetch(pollUrl, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' },
-        cache: 'no-store',
-        signal: ctrl.signal,
-      });
-
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-
-      if (data?.type && data.type !== 'none') {
-        console.log('[Hands-On/bg] Received gesture:', data);
-        broadcastGesture(data);
+  if (message.action === 'status' && fromTracker) {
+    const active = ['starting', 'running'].includes(message.status.state);
+    void chrome.action.setBadgeText({ text: active ? 'ON' : message.status.state === 'error' ? '!' : '' });
+    void chrome.action.setBadgeBackgroundColor({ color: message.status.state === 'error' ? '#b54430' : '#226b53' });
+    return;
+  }
+  const run = async () => {
+    if (message.action === 'get-status') return await hasTracker() ? trackerMessage('get-status') : { state: 'stopped' };
+    if (message.action === 'start') {
+      routeGeneration++;
+      await ensureTracker();
+      return trackerMessage('start');
+    }
+    if (message.action === 'stop') {
+      routeGeneration++;
+      if (await hasTracker()) {
+        await trackerMessage('stop');
+        await chrome.offscreen.closeDocument();
       }
-    } catch (err) {
-    // If expecting to stop then we can ignore the error
-      if (!polling) return;                
-      if (err?.name === 'AbortError') return;  p
-      console.error('[Hands-On/bg] Poll error:', err?.message || err);
-
-      // hard stop and schedule a restart with backoff
-      stopPolling(/*abort=*/true);
-      scheduleRestart();
+      await chrome.action.setBadgeText({ text: '' });
+      return { state: 'stopped' };
     }
+    throw new Error('Unknown action');
   };
-
-  // kick once immediately so we don’t wait 150ms
-  tick();
-  pollTimer = setInterval(tick, 150);
-}
-
-function stopPolling(abort = true) {
-  if (!polling && !pollTimer && !pollController) return;
-
-  console.log('[Hands-On/bg] Stopping polling');
-  polling = false;
-
-  if (pollTimer) {
-    clearInterval(pollTimer);
-    pollTimer = null;
-  }
-
-  // abort controller after clearing the interval (prevents race)
-  if (abort && pollController) {
-    try { pollController.abort(); } catch {}
-  }
-  pollController = null;
-}
-
-function scheduleRestart() {
-  // exponential backoff up to 30s
-  const delay = Math.min(backoffMs, 30000);
-  console.log(`[Hands-On/bg] Scheduling restart in ${Math.round(delay/1000)}s...`);
-  setTimeout(() => {
-    if (!polling) startPolling();
-  }, delay);
-  backoffMs = Math.min(delay * 2, 30000);
-}
-// broadcasts the gesture to the api
-function broadcastGesture(payload) {
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    for (const tab of tabs) {
-      if (!tab.id) continue;
-      chrome.tabs.sendMessage(
-        tab.id,
-        { kind: 'hands-on/gesture', payload },
-        () => { void chrome.runtime.lastError; }
-      );
-    }
-    console.log(`[Hands-On/bg] Broadcasting gesture to ${tabs.length} tab(s)`);
-  });
-}
-// Lifecycle
-chrome.runtime.onStartup.addListener(() => startPolling());
-chrome.runtime.onInstalled.addListener(() => startPolling());
-chrome.runtime.onSuspend.addListener(() => stopPolling(true));
-chrome.runtime.onSuspendCanceled?.addListener(() => startPolling());
+  const operation = message.action === 'get-status' ? run() : (transition = transition.catch(() => {}).then(run));
+  operation.then(respond, error => respond({ state: 'error', error: error.message }));
+  return true;
+});
+chrome.runtime.onStartup.addListener(() => { void chrome.action.setBadgeText({ text: '' }); });
+chrome.runtime.onInstalled.addListener(() => { void chrome.action.setBadgeText({ text: '' }); });

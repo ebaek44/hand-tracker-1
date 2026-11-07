@@ -1,0 +1,5 @@
+# Third-party assets
+
+- MediaPipe Tasks Vision 0.10.32 (`vendor/vision.js`, `vendor/wasm/*`) is published by Google under Apache-2.0. Source: https://github.com/google-ai-edge/mediapipe. The JavaScript bundle is wrapped to expose its CommonJS exports in a classic worker; its inference implementation is unchanged. License: `vendor/LICENSE`.
+- `models/hand_landmarker.task` is the MediaPipe Hand Landmarker float16 version 1 model distributed at https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task. Its SHA-256 is recorded beside the model. MediaPipe model documentation: https://developers.google.com/edge/mediapipe/solutions/vision/hand_landmarker.
+- The project's original gesture models/training lineage and upstream license are retained under `hand_tracker/`, including `hand_tracker/LICENSE`. The active static pose model is newly trained from this project's existing recorded landmark dataset; its training report is bundled beside it.

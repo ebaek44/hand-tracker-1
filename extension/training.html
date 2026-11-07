@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Training studio · Hands On</title><link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="training.css"></head>
+<body><main class="studio">
+  <header><div><div class="eyebrow">HANDS ON · TRAINING STUDIO</div><h1>Teach a new gesture<span>.</span></h1><p class="intro">Collect landmarks here. Train locally. Reload your extension.</p></div><button id="connect" class="primary">Connect camera</button></header>
+  <p id="error" class="error" role="alert" hidden></p>
+  <div class="studio-grid">
+    <section>
+      <div class="camera-preview"><video id="preview" muted autoplay playsinline></video><canvas id="overlay" width="640" height="480"></canvas><span id="camera-state" role="status">Camera is off</span></div>
+      <div class="status-card"><strong id="prediction">Choose a pose to collect</strong><p id="guidance">Hold the selected pose for all 3 seconds. Relax and reposition between batches. No images or video are saved.</p></div>
+      <p class="hint">Palm and neutral examples are preloaded; left/right start empty. Start with 10 batches per direction (about 300 samples each), changing position between batches. Add relaxed, ordinary hand positions to neutral classes. Each recording is kept as a separate group for validation.</p>
+    </section>
+    <section class="collection" aria-label="Training dataset">
+      <label for="label">Pose to record</label><select id="label"></select><button id="remove" class="text-button">Remove selected empty pose</button>
+      <div id="counts" class="counts"></div>
+      <button id="record" class="primary" disabled>Record a 3-second batch</button>
+      <details><summary>Add another pose</summary><label for="name">Pose name</label><input id="name" maxlength="60" placeholder="e.g. Two fingers right"><label for="action">Video action</label><select id="action"><option value="none">No action (neutral)</option><option value="toggle">Play / pause</option><option value="seek-right">Seek forward 10 seconds</option><option value="seek-left">Seek back 10 seconds</option></select><button id="add" class="text-button">Add pose</button></details>
+      <div class="dataset-actions"><button id="export" class="text-button">Export dataset</button><label class="import-label" for="import">Import dataset<input id="import" type="file" accept=".json,application/json"></label></div>
+      <p id="saved" class="hint" role="status">Dataset is saved in this extension on this computer.</p>
+    </section>
+  </div>
+  <section class="next-steps"><div class="section-label">AFTER COLLECTING</div><ol><li>Export your dataset. Aim for 100+ samples and at least 3 separate recordings per pose.</li><li>Run the local training command from the project folder:<code class="command">.venv/bin/python training/train.py --data /path/to/hands-on-dataset.json --install</code></li><li>Review <code>training/output/report.json</code>, then reload the extension at <code>chrome://extensions</code>.</li></ol><p class="hint">Python is only for training. Using the extension needs no Python or server. See training/README.md for setup and validation guidance.</p></section>
+</main><script src="training.js" type="module"></script></body></html>

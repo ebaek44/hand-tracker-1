@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Hands On</title><link rel="stylesheet" href="styles.css"></head>
+<body class="popup">
+  <main>
+    <div class="eyebrow">ON-DEVICE VIDEO CONTROLS</div>
+    <h1>Hands On<span>.</span></h1>
+    <p class="intro">A little movement. Full control.</p>
+    <section class="status-card" aria-label="Tracking status">
+      <div class="status-line"><span id="dot" class="dot"></span><strong id="state" role="status">Checking status…</strong></div>
+      <p id="detail">Your camera stays on your device.</p>
+      <div id="metrics" class="metrics" hidden><span><b id="fps">—</b> FPS</span><span><b id="latency">—</b> ms / frame</span></div>
+    </section>
+    <p id="error" class="error" role="alert" hidden></p>
+    <p id="training-note" class="hint" hidden></p>
+    <button id="toggle" class="primary" disabled>Start tracking</button>
+    <div class="section-label">YOUR GESTURES</div>
+    <dl class="gestures">
+      <div><dt>Open palm <small>Hold for 0.4 seconds</small></dt><dd>Play / pause</dd></div>
+      <div><dt>Point left / right <small>Hold to repeat</small></dt><dd>±10s / second</dd></div>
+    </dl>
+    <p class="hint">Hold a direction to seek; lower your hand to stop. Only the active video tab responds.</p>
+    <footer><button id="setup" class="text-button">Camera setup</button><button id="training" class="text-button">Training studio</button></footer>
+  </main>
+  <script src="popup.js" type="module"></script>
+</body></html>
