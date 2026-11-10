@@ -13,7 +13,7 @@ const files = [
   'manifest.json', 'background.js', 'content.js', 'youtube.js', 'icon128.png',
   'popup.html', 'popup.js', 'styles.css',
   'offscreen.html', 'offscreen.js', 'tracking-worker.js', 'lib/gestures.js',
-  'lib/ad-settings.js', 'lib/trusted-click.js', 'lib/training-settings.js',
+  'lib/sites.js', 'lib/ad-settings.js', 'lib/trusted-click.js', 'lib/training-settings.js',
   'models/pose-classifier.json', 'models/hand_landmarker.task',
   'models/hand_landmarker.sha256', 'THIRD_PARTY_NOTICES.md',
   'licenses/youtube-auto-skip.txt',

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "minimum_chrome_version": "116",
   "name": "Hands On Video Controls (Studio)",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "Hands-free play, pause, seeking, and optional YouTube ad skipping. Camera processing stays on your device.",
   "icons": {
     "128": "icon128.png"
@@ -14,8 +14,14 @@
     "debugger"
   ],
   "host_permissions": [
-    "http://*/*",
-    "https://*/*"
+    "https://www.youtube.com/*",
+    "https://youtube.com/*",
+    "https://m.youtube.com/*",
+    "https://www.netflix.com/*",
+    "https://netflix.com/*",
+    "https://www.primevideo.com/*",
+    "https://primevideo.com/*",
+    "https://www.amazon.com/*"
   ],
   "action": {
     "default_popup": "popup.html",

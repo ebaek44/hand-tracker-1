@@ -4,7 +4,7 @@ Hands On runs entirely on the user's computer. No hosted backend, Python install
 
 ## Upload this build
 
-The current package is **`dist/hands-on-2.1.1.zip`**. It contains `manifest.json` at the ZIP root. Do not upload the repository, old root `extension.zip`, Studio folder, or old native-helper binaries.
+The current package is **`dist/hands-on-2.1.2.zip`**. It contains `manifest.json` at the ZIP root. Do not upload the repository, old root `extension.zip`, Studio folder, or old native-helper binaries.
 
 | Folder | Chrome name | Use |
 | --- | --- | --- |
@@ -24,7 +24,7 @@ The builder copies your installed trained model; it never resets or retrains it.
 
 ## 1. Test the packaged extension
 
-Extract the new ZIP into a permanent folder. In `chrome://extensions`, enable Developer mode and Load unpacked that folder. Disable the Studio extension while testing. Confirm version **2.1.1** in Options.
+Extract the new ZIP into a permanent folder. In `chrome://extensions`, enable Developer mode and Load unpacked that folder. Disable the Studio extension while testing. Confirm version **2.1.2** in Options.
 
 Start tracking and approve the native camera prompt. First permission uses a temporary window showing the same Hands On controls; it closes when tracking starts. There is no separate Camera access page or persistent link. Later starts use the existing grant. Verify play/pause, held ±10-second seeking, release, stopping/restarting and optional YouTube skipping on your actual camera. Ad skipping remains off until enabled in Options. Pinch scrubbing is not included.
 
@@ -54,11 +54,19 @@ Suggested full description:
 >
 > Optional YouTube ad skipping is off by default. Enable it in Options, then point up while YouTube's native Skip ad button is visible. It does not bypass countdowns or unskippable ads. This feature uses Chrome's debugger permission and may show a debugging notice during the click. Chrome requires this permission at installation, even while the option is off.
 >
-> Works with accessible HTML video players on ordinary websites. Chrome's internal pages, the Chrome Web Store, some embedded players and unusual site-specific players cannot be controlled. Recognition depends on hand visibility and lighting.
+> Works with accessible HTML video players on YouTube, Netflix and Prime Video. Chrome's internal pages, the Chrome Web Store, some embedded players and unusual site-specific players cannot be controlled. Recognition depends on hand visibility and lighting.
+
+## Scoped host-permission justification
+
+Paste this into the Store's Host permission justification after uploading 2.1.2:
+
+> Access is limited to the HTTPS domains used by YouTube, Netflix and Prime Video, including www.amazon.com for US Prime Video. It is needed to locate and control the video in the user's active supported tab after a hand gesture. Amazon use is additionally restricted in code to /gp/video/ pages; ordinary shopping pages and unrelated websites are refused before injection. Ad skipping works only on YouTube. No all-sites or CDN access is requested, and no browsing history or page content is uploaded.
+
+The exact manifest lists the www/bare YouTube, Netflix and PrimeVideo domains, mobile YouTube, and www.amazon.com. Chrome ignores host-permission path restrictions, so Amazon's host grant cannot be narrowed to /gp/video/ in the manifest. The application enforces that restriction itself. Other regional Amazon storefronts are excluded. Scoped grants preserve switching between supported tabs without requiring a fresh extension click for each origin, as activeTab would. [Chrome host match-pattern rules](https://developer.chrome.com/docs/extensions/develop/concepts/match-patterns).
 
 ## 4. Upload and complete Privacy practices
 
-In the Dashboard, select **Add new item**, upload `dist/hands-on-2.1.1.zip`, then fill Store listing, Privacy practices, Distribution and Test instructions. [Publishing workflow](https://developer.chrome.com/docs/webstore/publish).
+In the Dashboard, select **Add new item**, upload `dist/hands-on-2.1.2.zip`, then fill Store listing, Privacy practices, Distribution and Test instructions. [Publishing workflow](https://developer.chrome.com/docs/webstore/publish).
 
 Single-purpose text:
 
@@ -70,7 +78,7 @@ Permission justifications, based on the actual implementation:
 | --- | --- |
 | `offscreen` | Keeps the user-started camera and local inference running when the popup closes. Stop tracking releases the stream and closes this document. |
 | `scripting` | Injects packaged video-control code into the active page and its accessible frames only when a gesture occurs. |
-| HTTP/HTTPS host access | Finds and controls the active video across user-chosen websites, including accessible embedded frames. It does not scan browsing history or run a continuous site watcher. |
+| Named HTTPS host access | Limited to YouTube, Netflix and Prime Video player domains, including www.amazon.com for US Prime Video. Finds and controls the active video only on those services. Amazon is further limited in code to /gp/video/ pages; ordinary shopping pages are refused. No all-sites, CDN or HTTP access is requested. |
 | `storage` | Saves the user's local, default-off YouTube ad-skipping preference. |
 | `debugger` | Only when the user enables ad skipping and points up: briefly attach to the active YouTube tab and send browser-level input to an already-visible native Skip ad button, then detach. No queued skips. Chrome disallows declaring this permission as optional. |
 
@@ -80,13 +88,13 @@ For remote code, explain that JavaScript, WASM and inference models are bundled;
 
 Suggested reviewer instructions:
 
-> No login or credentials are required. Use a desktop/laptop with a camera. Open an ordinary website with an HTML video, open Hands On, select Start tracking and allow the camera. The first-use permission window closes when tracking starts. An open palm held briefly toggles play/pause once; relax before repeating. Point left/right to seek by 10 seconds repeatedly while held, and lower the hand to stop. Stop tracking releases the camera.
+> No extension login is required. Use a public YouTube video for review without a streaming subscription. Netflix and Prime Video require the reviewer’s own service access. Use a desktop/laptop with a camera. Open a public YouTube video, open Hands On, select Start tracking and allow the camera. The first-use permission window closes when tracking starts. An open palm held briefly toggles play/pause once; relax before repeating. Point left/right to seek by 10 seconds repeatedly while held, and lower the hand to stop. Stop tracking releases the camera.
 >
 > YouTube ad skipping is an explicit default-off option. Enable Options → YouTube ad skipping. With a native Skip ad button already visible, hold point-up briefly. The extension sends one browser-level click, verifies the result and detaches. Missing/disabled buttons cause no future queued action. Chrome can show a debugging notice. Open embedded YouTube videos in their own YouTube tab for this feature. No separate helper, training step or test button is needed.
 
 Choose **Public** for Store discovery or **Unlisted** for installation through a direct link. Both require review. Select your distribution regions, save all required fields, and submit for review. If offered, choose to publish manually after approval so you can control launch timing. [Distribution](https://developer.chrome.com/docs/webstore/cws-dashboard-distribution).
 
-Google may ask for clarification about broad site access or debugger use; explain their narrow actual use above. Review approval is Google's decision. Do not change the description to conceal these capabilities.
+Google may ask for clarification about Amazon host access or debugger use; explain their narrow actual use above. Review approval is Google's decision. Do not change the description to conceal these capabilities.
 
 ## Future updates
 

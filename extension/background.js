@@ -1,3 +1,4 @@
+import { supportedSite, youtubeSite } from './lib/sites.js';
 // Event-driven broker only. The offscreen page owns camera and inference;
 // Manifest V3 service-worker suspension cannot interrupt the tracking loop.
 import { adSkippingEnabled, setAdSkipping } from './lib/ad-settings.js';
@@ -43,7 +44,9 @@ async function routeGesture(payload) {
     const window = await chrome.windows.getLastFocused();
     if (!window.focused) return finish({ ok: false, code: 'not-focused', error: 'Bring the video’s Chrome window to the front and try again.' });
     const [tab] = await chrome.tabs.query({ active: true, windowId: window.id });
-    if (!tab?.id || !/^https?:/.test(tab.url ?? '')) return finish({ ok: false, code: 'not-web-page', error: 'Open a video website in the active tab and try again.' });
+    if (!tab?.id || !/^https?:/.test(tab.url ?? '')) return finish({ ok: false, code: 'not-web-page', error: 'Open YouTube, Netflix, or Prime Video to use Hands On.' });
+    if (!supportedSite(tab.url)) return finish({ ok: false, code: 'unsupported-site', error: 'Open YouTube, Netflix, or Prime Video to use Hands On.' });
+    if (skip && !youtubeSite(tab.url)) return finish({ ok: false, code: 'unsupported', error: 'Ad skipping is available only on YouTube.' });
     // Injection is idempotent. Scan only on an actual gesture, never on a timer.
     stage = 'injection';
     await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: skip ? ['youtube.js'] : ['content.js'] });
@@ -68,7 +71,7 @@ async function routeGesture(payload) {
       if (current !== routeGeneration || !await adSkippingEnabled()) return false;
       const [active] = await chrome.tabs.query({ active: true, windowId: window.id });
       const focused = await chrome.windows.getLastFocused();
-      return active?.id === tab.id && active.url === tab.url && focused.id === window.id && focused.focused;
+      return active?.id === tab.id && active.url === tab.url && youtubeSite(active.url) && focused.id === window.id && focused.focused;
     }) : chrome.tabs.sendMessage(tab.id,
       { kind: 'hands-on/gesture', payload, token: best.result.token }, { frameId: best.frameId });
     // Skip confirmation may take a moment; do not block play/pause or seeking.

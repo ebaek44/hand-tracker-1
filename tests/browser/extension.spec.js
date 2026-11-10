@@ -4,7 +4,6 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 
 test('packaged camera inference, lifecycle, video routing, and training studio', async () => {
@@ -52,17 +51,14 @@ test('packaged camera inference, lifecycle, video routing, and training studio',
     // A seekable, local video fixture exercises the real broker and content scripts.
     await context.setOffline(false);
     const clip = await readFile(new URL('../fixtures/video.webm', import.meta.url));
-    const server = createServer((request, response) => {
-      if (request.url === '/clip.webm') {
-        response.writeHead(200, { 'Content-Type': 'video/webm', 'Content-Length': clip.length, 'Accept-Ranges': 'bytes' }); response.end(clip);
-      } else {
-        response.writeHead(200, { 'Content-Type': 'text/html' });
-        response.end(request.url === '/frame'
+    await context.route(/^https:\/\/(www\.youtube\.com|www\.netflix\.com|www\.primevideo\.com|www\.amazon\.com|example\.com)\//, route => {
+      const pathname = new URL(route.request().url()).pathname;
+      return route.fulfill(pathname === '/clip.webm'
+        ? { contentType: 'video/webm', headers: { 'Content-Length': String(clip.length), 'Accept-Ranges': 'bytes' }, body: clip }
+        : { contentType: 'text/html', body: pathname === '/frame'
           ? '<video id="embedded" src="/clip.webm" preload="auto" style="width:320px;height:180px"></video>'
-          : '<video id="main" src="/clip.webm" preload="auto" style="width:640px;height:360px"></video><video id="other" src="/clip.webm" preload="auto" style="width:100px;height:60px"></video><iframe src="/frame" width="330" height="200"></iframe>');
-      }
+          : '<video id="main" src="/clip.webm" preload="auto" style="width:640px;height:360px"></video><video id="other" src="/clip.webm" preload="auto" style="width:100px;height:60px"></video><iframe src="/frame" width="330" height="200"></iframe>' });
     });
-    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     const page = await context.newPage();
     const cdp = await context.newCDPSession(popup);
     const allTargets = await cdp.send('Target.getTargets');
@@ -88,7 +84,7 @@ test('packaged camera inference, lifecycle, video routing, and training studio',
       return result;
     }
     try {
-      await page.goto(`http://127.0.0.1:${server.address().port}`);
+      await page.goto('https://www.youtube.com/watch?v=local-fixture');
       await page.bringToFront();
       await expect.poll(() => page.locator('#main').evaluate(v => v.readyState)).toBeGreaterThanOrEqual(2);
       await expect.poll(() => page.locator('#main').evaluate(v => v.seekable.length)).toBeGreaterThan(0);
@@ -118,6 +114,34 @@ test('packaged camera inference, lifecycle, video routing, and training studio',
       // Ad skipping is opt-in. Point-up cannot enable browser control.
       await fromTracker({ type: 'control', value: 'skip_ad' });
       await expect.poll(() => popup.evaluate(async () => (await chrome.runtime.sendMessage({ target: 'background', action: 'get-status' })).feedback)).toBe('Enable YouTube ad skipping in Options to use point up.');
+      // Exercise the unchanged video controller on each permitted service origin.
+      for (const url of ['https://www.netflix.com/watch/1', 'https://www.primevideo.com/detail/1', 'https://www.amazon.com/gp/video/detail/1']) {
+        await page.goto(url);
+        await expect.poll(() => page.locator('#main').evaluate(v => v.seekable.length)).toBeGreaterThan(0);
+        await page.locator('#main').evaluate(v => { v.currentTime = 20; });
+        await fromTracker({ type: 'seek', value: 'right' });
+        await expect.poll(() => page.locator('#main').evaluate(v => Math.round(v.currentTime))).toBe(30);
+      }
+      await popup.evaluate(() => chrome.runtime.sendMessage({ target: 'background', action: 'set-ad-skipping', enabled: true }));
+      await fromTracker({ type: 'control', value: 'skip_ad' });
+      await expect.poll(() => popup.evaluate(async () => (await chrome.runtime.sendMessage({ target: 'background', action: 'get-status' })).feedback)).toBe('Ad skipping is available only on YouTube.');
+      // Even with debugger's powerful grant, refuse unrelated pages before injection.
+      for (const url of ['https://example.com/', 'https://www.amazon.com/cart']) {
+        await page.goto(url);
+        await expect.poll(() => page.locator('#main').evaluate(v => v.seekable.length)).toBeGreaterThan(0);
+        await fromTracker({ type: 'seek', value: 'right' });
+        await expect.poll(() => popup.evaluate(async () => (await chrome.runtime.sendMessage({ target: 'background', action: 'get-status' })).feedback)).toBe('Open YouTube, Netflix, or Prime Video to use Hands On.');
+        expect(await page.locator('#main').evaluate(v => v.currentTime)).toBe(0);
+        if (url.includes('amazon.com')) {
+          const injected = await background.evaluate(async () => {
+            const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+            const [result] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => Boolean(globalThis.__handsOnController) });
+            return result.result;
+          });
+          expect(injected).toBe(false);
+        }
+      }
+      await popup.evaluate(() => chrome.runtime.sendMessage({ target: 'background', action: 'set-ad-skipping', enabled: false }));
       // Tracking must survive the MV3 broker going idle/restarting.
       await cdp.send('Target.detachFromTarget', { sessionId });
       await cdp.send('ServiceWorker.enable');
@@ -129,7 +153,6 @@ test('packaged camera inference, lifecycle, video routing, and training studio',
       console.log('Video routing: play, pause, ±10s, single-frame selection, embedded video, worker restart passed.');
     } finally {
       await page.close();
-      await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); });
       await cdp.detach();
     }
     await popup.locator('#toggle').click();

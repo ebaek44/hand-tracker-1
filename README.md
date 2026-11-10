@@ -6,7 +6,7 @@ Control browser videos with a camera and deliberate hand poses. **The Chrome ext
 
 - `extension/` is **Hands On Video Controls (Studio)**, with training tools available through a default-off **Options → Training studio** switch.
 - Run `npm run build:release` to generate `dist/hands-on/`, **Hands On Video Controls**, with no training pages, datasets, reports, or diagnostics.
-- The locally prepared shareable archive is `dist/hands-on-2.1.1.zip`. Nothing is hosted or published automatically.
+- The locally prepared shareable archive is `dist/hands-on-2.1.2.zip`. Nothing is hosted or published automatically.
 
 [Sharing and Chrome Web Store options](PUBLISHING.md) cover unpacked testing, unlisted/public listings, and submission steps. Use one tracking instance at a time if both builds are loaded.
 
@@ -15,10 +15,18 @@ Control browser videos with a camera and deliberate hand poses. **The Chrome ext
 1. Open `chrome://extensions` in Chrome 116 or newer and enable **Developer mode**.
 2. Choose **Load unpacked** and select this project's `extension/` folder. If you loaded the old extension already, select **Reload**.
 3. Open Hands On from Chrome's toolbar. Select **Start tracking**. On first use, the same Hands On controls open temporarily in a small window so Chrome can show its native camera prompt. Allow camera access; the window closes once tracking starts. Your operating system may also ask for camera access.
-4. Return to an ordinary HTTP/HTTPS video page and click play once if Chrome requires it. Tracking runs in a hidden extension document; later starts need no extra window while camera permission remains granted.
+4. Return to YouTube, Netflix, or Prime Video and click play once if Chrome requires it. Tracking runs in a hidden extension document; later starts need no extra window while camera permission remains granted.
 5. Open the extension and select **Stop tracking** to release the camera and remove the worker/document. Tracking starts only when requested, not automatically on browser launch.
 
 All JavaScript, WebAssembly, and model assets are included in `extension/`. Loading this folder needs no npm install, development server, or internet connection. Streaming sites themselves still need their usual connection. The root `extension.zip`, root `popup.html`, helper ZIPs, and old releases are **legacy artifacts**, not the new extension.
+
+## Supported sites and permission scope
+
+Access is limited to HTTPS pages on `www.youtube.com`, `youtube.com`, `m.youtube.com`, `www.netflix.com`, `netflix.com`, `www.primevideo.com`, `primevideo.com`, and `www.amazon.com`. Amazon use is additionally restricted in code to `/gp/video/` pages. Chrome ignores path restrictions for host permissions, so the Amazon manifest grant covers its host; ordinary shopping pages are refused before injection. No generic HTTP/HTTPS, wildcard host, CDN, localhost, or activeTab permission is requested. Regional Amazon storefronts other than the US are not included; use PrimeVideo.com where available.
+
+Ad skipping is **YouTube only**. Other sites are refused before script injection, even while ad skipping is enabled. Named host grants allow gestures to follow supported tabs without clicking the extension on every site change; activeTab would require a new browser interaction on a different origin. The debugger permission remains required for the user-approved ad-skip implementation and may still receive scrutiny during review.
+
+Automated fixtures verify routing/permissions on the named services; they do not prove compatibility with every live Netflix/Prime Video player or DRM variant. Live YouTube skipping was confirmed by the user. No media downloads, DRM bypass, or ad skipping for Netflix/Prime Video is implemented.
 
 ## Camera permission and device choice
 
@@ -36,7 +44,7 @@ Hands On does not enumerate devices or present its own picker. With multiple cam
 | Point up | With YouTube ad skipping enabled in Options, hold briefly to press the visible Skip ad button. Relax before using again. |
 | Lower/relax hand | Stop seeking. |
 
-The active tab in the focused browser window receives commands. The extension selects a single visible, ready video, favoring playing/audible video and then visible area, including accessible embedded players and open shadow roots. Playback respects browser autoplay restrictions; seek commands clamp to the available seekable ranges. Chrome's internal pages, the Chrome Web Store, inaccessible frames, and players without a usable HTML video element cannot be controlled. Closed shadow DOM and unusual site-specific players may need further adaptation.
+Only the active YouTube, Netflix, or Prime Video tab in the focused browser window receives commands. The extension selects a single visible, ready video, favoring playing/audible video and then visible area, including accessible embedded players and open shadow roots. Playback respects browser autoplay restrictions; seek commands clamp to the available seekable ranges. Chrome's internal pages, the Chrome Web Store, inaccessible frames, and players without a usable HTML video element cannot be controlled. Closed shadow DOM and unusual site-specific players may need further adaptation.
 
 The current local model was trained from the user's `hands-on-dataset.json`: 614 fresh right-point samples across 20 recordings, 519 fresh left-point samples across 17 recordings, and the retained palm/neutral examples. No archived directional rows were added. The model is installed in `extension/models/pose-classifier.json`; reload the unpacked extension to use it. Held-out directional recordings were correctly classified in recorded validation (122/122 right, 92/92 left); live hand/site accuracy still needs manual checking. See `extension/models/training-report.json`.
 
@@ -107,4 +115,4 @@ Point-up starts a direct, one-time scan for the visible Skip ad control in the a
 
 Chrome requires declaring the debugger permission at installation; [it cannot be an optional permission](https://developer.chrome.com/docs/extensions/reference/api/permissions#implement_optional_permissions). The option controls whether Hands On uses it. Chrome may show a debugging notice during the click. No additional page data or camera frames are uploaded. The popup shows skip results. There is no manual Skip ad test button or message route; only recognized gestures trigger ad clicks.
 
-After updating, reload the unpacked extension, confirm version 2.1.1, and refresh YouTube. No model retraining is needed. Automated checks verify default-off behavior, trusted input, no queued clicks, cancellation and cleanup. The user confirmed live YouTube skipping works with this mode; site changes can still affect compatibility.
+After updating, reload the unpacked extension, confirm version 2.1.2, and refresh YouTube. No model retraining is needed. Automated checks verify default-off behavior, trusted input, no queued clicks, cancellation and cleanup. The user confirmed live YouTube skipping works with this mode; site changes can still affect compatibility.
