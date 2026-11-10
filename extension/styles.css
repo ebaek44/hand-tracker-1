@@ -1,10 +1,10 @@
 :root { color-scheme: light; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #1d302b; background: #f5f4ee; }
 * { box-sizing: border-box; }
 body { margin: 0; }
-body.popup { width: 360px; }
-main { padding: 27px 25px 18px; }
+body.popup { width: 380px; }
+main { padding: 25px 25px 19px; }
 .eyebrow, .section-label { font-size: 10px; font-weight: 700; letter-spacing: 1.7px; color: #597167; }
-h1 { font-size: 40px; letter-spacing: -1.9px; line-height: 1.1; margin: 10px 0 7px; font-weight: 650; }
+h1 { font-size: 42px; letter-spacing: -1.9px; line-height: 1.1; margin: 18px 0 7px; font-weight: 650; }
 h1 span { color: #278465; }
 .intro { font-size: 13px; color: #65746b; margin: 0 0 25px; }
 .status-card { padding: 17px; background: #e8ede5; border: 1px solid #d9e1d6; border-radius: 13px; }
@@ -13,7 +13,7 @@ h1 span { color: #278465; }
 .dot.active { background: #278465; box-shadow: 0 0 0 4px #27846514; }
 .dot.failed { background: #b54430; }
 .status-card p { margin: 9px 0 0; font-size: 12px; line-height: 1.5; color: #5d6b60; }
-.metrics { display: flex; gap: 25px; margin-top: 14px; padding-top: 12px; border-top: 1px solid #d2ddce; font-size: 11px; color: #647362; font-variant-numeric: tabular-nums; }
+.metrics { display: flex; gap: 25px; margin-top: 10px; padding-top: 0; font-size: 11px; color: #647362; font-variant-numeric: tabular-nums; }
 .metrics b { font-size: 15px; color: #274737; font-weight: 600; }
 [hidden] { display: none !important; }
 button { font: inherit; cursor: pointer; }
@@ -23,18 +23,39 @@ button { font: inherit; cursor: pointer; }
 button:disabled { opacity: .6; cursor: wait; }
 button:focus-visible, a:focus-visible { outline: 3px solid #b77c28; outline-offset: 4px; }
 .gestures { margin: 10px 0 0; font-size: 12px; }
-.gestures > div { display: flex; justify-content: space-between; align-items: center; padding: 13px 0; border-bottom: 1px solid #e0e3d9; gap: 12px; }
+.gestures > div { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-bottom: 1px solid #e0e3d9; gap: 12px; }
 dt { font-weight: 600; }
 dt small { display: block; font-size: 11px; color: #738074; font-weight: 400; margin-top: 4px; }
-dd { margin: 0; color: #52674e; }
+dd { margin: 0 0 0 auto; color: #36583f; text-align: right; white-space: nowrap; font-size: 11px; }
+dd small { display: block; margin-top: 4px; color: #74816d; font-size: 10px; }
 .hint { font-size: 11px; line-height: 1.65; color: #6c786b; margin: 15px 0 24px; }
 footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 10px; color: #75806f; }
 .text-button { background: none; border: 0; padding: 5px 0; color: #42674f; font-size: 11px; text-decoration: underline; text-underline-offset: 3px; }
 .error { color: #a13727; font-size: 12px; line-height: 1.5; }
-.setup-page { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
-.setup-page main { width: min(100%, 480px); padding: 35px; border: 1px solid #d9dfd3; border-radius: 20px; background: #faf9f4; }
-.setup-page h1 { font-size: 42px; }
-.setup-page .intro { line-height: 1.7; margin: 20px 0; }
-.setup-page .primary { margin-bottom: 0; }
-.setup-page .hint { margin-bottom: 0; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-mark { display: grid; place-items: center; width: 29px; height: 29px; border-radius: 9px; color: #edf5e8; background: #235b46; }
+.brand-mark svg { width: 24px; height: 24px; }
+.gesture-symbol { display: grid; place-items: center; flex: 0 0 36px; height: 36px; color: #4b7354; background: #e7ecdf; border-radius: 11px; font-size: 18px; letter-spacing: -1px; }
+.diagnostics { margin-top: 12px; border-top: 1px solid #d2ddce; padding-top: 10px; }
+.diagnostics summary { font-size: 10px; color: #65765f; cursor: pointer; }
+.privacy { font-size: 10px; color: #6b7966; }
+.privacy > span { color: #438660; font-size: 7px; margin-right: 4px; }
+.authoring-tools { text-align: right; margin-top: 9px; }
+.authoring-tools .text-button { color: #74816d; font-size: 10px; }
+.popup main { padding: 20px 24px 16px; }
+.popup .brand-mark { width: 24px; height: 24px; border-radius: 7px; }
+.popup h1 { font-size: 38px; margin: 14px 0 6px; }
+.popup .intro { margin-bottom: 18px; }
+.popup .status-card { padding: 14px 16px; }
+.popup .primary { margin: 14px 0 18px; padding: 12px 18px; }
+.popup .gestures > div { padding: 7px 0; }
+.popup .gesture-symbol { flex-basis: 32px; height: 32px; border-radius: 9px; font-size: 16px; }
+.popup .hint { margin: 12px 0 16px; }
+.options { margin: 0 0 13px; border-top: 1px solid #e0e3d9; padding-top: 10px; }
+.options summary { cursor: pointer; color: #48614a; font-size: 11px; }
+.options summary span { float: right; color: #7a8473; font-size: 10px; }
+.option-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; font-size: 12px; margin-top: 16px; }
+.option-row input { accent-color: #235b46; width: 17px; height: 17px; cursor: pointer; }
+.option-help { font-size: 11px; line-height: 1.55; color: #697765; margin: 9px 0 0; }

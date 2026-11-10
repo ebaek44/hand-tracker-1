@@ -4,7 +4,7 @@ The extension is self contained. Python is only needed when you choose to train 
 
 ## 1. Collect in Chrome
 
-Load the local `extension/` folder at `chrome://extensions`, open Hands On, and select **Training studio**. Connect the camera (this stops live video control while collecting). Choose a pose and hold it throughout a three-second batch. Relax and reposition between batches; do not switch poses during a batch. The mirrored preview shows the same landmarks the classifier receives.
+Load the local `extension/` folder at `chrome://extensions`, open **Hands On Video Controls (Studio)**, and select **Training studio**. Connect the camera (this stops live video control while collecting). Choose a pose and hold it throughout a three-second batch. Relax and reposition between batches; do not switch poses during a batch. The mirrored preview shows the same landmarks the classifier receives.
 
 The studio preloads 4,639 archived palm/neutral examples. **Left/right start with zero carried examples.** After an explicit baseline reset, the original three-class palm/neutral classifier is active until you install new directional training. The current local extension already has the model trained from the user’s exported recordings installed; reload it to use those directions.
 
@@ -19,11 +19,11 @@ Default labels and actions:
 | Point right       | Seek +10 seconds after a 0.35-second hold; repeat every second |
 | Point left        | Seek −10 seconds after a 0.35-second hold; repeat every second |
 
-Use **Add another pose** to assign an additional pose to any of the four actions. Use **Remove selected empty pose** before collecting if you want a smaller pose list. These are model classes, not hard-coded landmark heuristics. Pinch/drag is a separate future interaction and is not implemented by adding a static label.
+Use **Add another pose** to assign an additional pose to any of the available actions. Use **Remove selected empty pose** before collecting if you want a smaller pose list. These are model classes, not hard-coded landmark heuristics. Pinch/drag is a separate future interaction and is not implemented by adding a static label.
 
 **Start with 10 three-second batches for Point right and 10 for Point left**, roughly 300 samples each at the studio’s 10 FPS target (fewer on slower machines). This is a starting collection plan, not a reliability guarantee. Change hand position, distance, and slight angle between batches, and include a second lighting condition. The palm/neutral classes already have examples; add 5–10 batches of your own relaxed/closed hand if ordinary movements cause false triggers.
 
-Neutral means a visible hand that is not issuing a command: relaxed/curled fingers, a loose fist, and resting positions. Use Closed hand for relaxed/closed examples; keep Point up as its own neutral class. Do not label deliberate open-palm or left/right poses as neutral. A missing hand is handled directly and needs no training samples. Each listed class needs at least 10 examples to train, including any custom empty classes you added.
+Neutral means a visible hand that is not issuing a command: relaxed/curled fingers, a loose fist, and resting positions. Use Closed hand for relaxed/closed examples. Point up is now reserved for the YouTube Skip ad action; it is ignored when no supported Skip ad button is available. Do not label deliberate open-palm or left/right poses as neutral. A missing hand is handled directly and needs no training samples. Each listed class needs at least 10 examples to train, including any custom empty classes you added.
 
 The studio stores **42 normalized x/y landmark features**, labels, and a recording ID in IndexedDB. It does not store camera images. Dataset state survives reloading the studio; removing the extension removes its local data. Export a JSON backup. Import merges matching label lists and skips duplicate rows. Export/import are available while the camera is off.
 
@@ -77,3 +77,7 @@ Studio exports already include the archived palm/neutral examples, so `--legacy-
 ## Interaction tuning
 
 `extension/lib/gestures.js` contains dwell, release, and repeat timing. `extension/tracking-worker.js` applies a 0.80 classifier confidence threshold. Timing can suppress brief accidental poses; it cannot fix missing training coverage or an overconfident classifier. Do not add overlapping cooldown locks to compensate for bad labels. Collect better examples and use the confusion matrix first.
+
+## Hide training for users
+
+Keep training in the `extension/` Studio build. `npm run build:release` creates `dist/hands-on/` without the studio, datasets, reports, training links, or diagnostic UI. The installed trained model is copied into that build. Use **Options → Training studio** to opt in or out in the working extension. It starts off; turning it off stops an open Studio camera and hides its view without deleting recordings. `trainingEnabled` in `extension/config.js` remains the build capability flag, and the release builder always disables it. See `PUBLISHING.md` for sharing and Store submission. Older stored/imported recordings automatically gain the requested Point up → Skip ad action mapping without changing their sample features or discarding recordings.

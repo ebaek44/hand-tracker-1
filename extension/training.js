@@ -1,8 +1,13 @@
-import { sampleKey, withRetainedExamples } from './lib/training-data.js';
+import { trainingOptedIn } from './lib/training-settings.js';
+import { sampleKey, withRetainedExamples, upgradePointUpAction } from './lib/training-data.js';
+if (!await trainingOptedIn()) {
+  location.replace(chrome.runtime.getURL('popup.html'));
+} else {
+document.body.hidden = false;
 const $ = id => document.getElementById(id);
 const defaultLabels = [
   { name: 'Open palm', action: 'toggle' }, { name: 'Closed hand', action: 'none' },
-  { name: 'Point up', action: 'none' }, { name: 'Confirm / neutral', action: 'none' },
+  { name: 'Point up', action: 'skip-ad' }, { name: 'Confirm / neutral', action: 'none' },
   { name: 'Point right', action: 'seek-right' }, { name: 'Point left', action: 'seek-left' },
 ];
 let dataset = { schemaVersion: 1, labels: defaultLabels, samples: [] };
@@ -38,9 +43,8 @@ function render() {
     const row = document.createElement('div');
     const name = document.createElement('span'); name.textContent = label.name;
     const samples = dataset.samples.filter(sample => sample.label === index);
-    const carried = samples.filter(s => s.session === 'legacy').length;
     const batches = new Set(samples.filter(s => s.session !== 'legacy').map(s => s.session)).size;
-    const count = document.createElement('span'); count.textContent = `${carried} carried + ${samples.length - carried} new · ${batches} batches`;
+    const count = document.createElement('span'); count.textContent = `${samples.length} samples${batches ? ` · ${batches} recordings` : ''}`;
     row.append(name, count); return row;
   }));
 }
@@ -164,10 +168,11 @@ $('import').addEventListener('change', async () => {
   try {
     const file = $('import').files[0];
     if (!file || file.size > 25e6) throw new Error('Choose a dataset smaller than 25 MB.');
-    const data = JSON.parse(await file.text());
+    let data = JSON.parse(await file.text());
+    if (Array.isArray(data.labels)) data = upgradePointUpAction(data);
     if (data.schemaVersion !== 1 || !Array.isArray(data.labels) || !Array.isArray(data.samples) ||
         data.labels.length < 1 || data.labels.length > 20 || data.samples.length > 10000 ||
-        data.labels.some(l => typeof l.name !== 'string' || l.name.length > 60 || !['none', 'toggle', 'seek-left', 'seek-right'].includes(l.action)) ||
+        data.labels.some(l => typeof l.name !== 'string' || l.name.length > 60 || !['none', 'toggle', 'seek-left', 'seek-right', 'skip-ad'].includes(l.action)) ||
         data.samples.some(s => !Number.isInteger(s.label) || s.label < 0 || s.label >= data.labels.length || typeof s.session !== 'string' ||
           !Array.isArray(s.features) || s.features.length !== 42 || s.features.some(n => typeof n !== 'number' || !Number.isFinite(n) || Math.abs(n) > 1.001))) {
       throw new Error('Invalid Hands On dataset.');
@@ -191,7 +196,7 @@ try {
     const request = db.transaction('datasets').objectStore('datasets').get('current');
     request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
   });
-  if (stored) dataset = stored;
+  if (stored) dataset = upgradePointUpAction(stored);
 } catch (e) { error(`Local saving unavailable: ${e.message}. Export before closing.`); }
 try {
   const seed = await (await fetch('models/training-seed.json')).json();
@@ -200,3 +205,11 @@ try {
 } catch (e) { error(`Could not load/save retained examples: ${e.message}`); }
 render();
 window.addEventListener('pagehide', () => stop(false));
+chrome.storage.onChanged.addListener(async (changes, area) => {
+  if (area !== 'local' || !changes.trainingOptIn || changes.trainingOptIn.newValue === true) return;
+  stop(false);
+  try { await persist(); } catch { /* Existing recordings remain in IndexedDB. */ }
+  location.replace(chrome.runtime.getURL('popup.html'));
+});
+
+}

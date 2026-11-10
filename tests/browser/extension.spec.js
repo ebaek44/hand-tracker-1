@@ -1,5 +1,6 @@
 import { test, expect, chromium } from '@playwright/test';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, access } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,11 +25,21 @@ test('packaged camera inference, lifecycle, video routing, and training studio',
     context.on('weberror', e => errors.push(e.error().message));
     await popup.goto(`chrome-extension://${id}/popup.html`);
     await expect(popup.locator('#state')).toHaveText('Camera is off');
+    await expect(popup.locator('#training')).toBeHidden();
+    await expect(popup.locator('#try-skip')).toHaveCount(0);
+    await expect(popup.locator('#setup')).toHaveCount(0);
+    await popup.locator('.options summary').click();
+    await expect(popup.locator('#training-mode')).not.toBeChecked();
+    await popup.locator('#training-mode').check();
+    await expect(popup.locator('#training')).toBeVisible();
+    await expect(popup.locator('#ad-skipping')).not.toBeChecked();
+    expect(await popup.evaluate(() => chrome.permissions.contains({ permissions: ['debugger'] }))).toBe(true);
+    await popup.locator('.options summary').click();
     await popup.locator('body').screenshot({ path: '/private/tmp/hands-on-popup.png' });
     // Run all inference offline; every JS/WASM/model asset must be packaged.
     await context.setOffline(true);
     await popup.evaluate(() => chrome.runtime.sendMessage({ target: 'background', action: 'start' }));
-    await expect(popup.locator('#state')).toHaveText('Tracking is on', { timeout: 40000 });
+    await expect(popup.locator('#state')).toHaveText('You’re in control', { timeout: 40000 });
     await expect.poll(() => popup.locator('#fps').textContent()).not.toBe('0');
     await expect.poll(() => popup.locator('#latency').textContent()).not.toBe('—');
     const first = await popup.evaluate(() => chrome.runtime.sendMessage({ target: 'background', action: 'get-status' }));
@@ -104,6 +115,9 @@ test('packaged camera inference, lifecycle, video routing, and training studio',
       await page.waitForTimeout(250);
       await fromTracker({ type: 'seek', value: 'right' });
       await expect.poll(() => embedded.evaluate(v => Math.round(v.currentTime))).toBe(10);
+      // Ad skipping is opt-in. Point-up cannot enable browser control.
+      await fromTracker({ type: 'control', value: 'skip_ad' });
+      await expect.poll(() => popup.evaluate(async () => (await chrome.runtime.sendMessage({ target: 'background', action: 'get-status' })).feedback)).toBe('Enable YouTube ad skipping in Options to use point up.');
       // Tracking must survive the MV3 broker going idle/restarting.
       await cdp.send('Target.detachFromTarget', { sessionId });
       await cdp.send('ServiceWorker.enable');
@@ -122,7 +136,7 @@ test('packaged camera inference, lifecycle, video routing, and training studio',
     await expect(popup.locator('#state')).toHaveText('Camera is off');
     expect(await background.evaluate(() => chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] }))).toHaveLength(0);
     await popup.locator('#toggle').click();
-    await expect(popup.locator('#state')).toHaveText('Tracking is on', { timeout: 30000 });
+    await expect(popup.locator('#state')).toHaveText('You’re in control', { timeout: 30000 });
     await popup.locator('#toggle').click();
     await expect(popup.locator('#state')).toHaveText('Camera is off');
     await context.setOffline(false);
@@ -148,7 +162,7 @@ test('packaged camera inference, lifecycle, video routing, and training studio',
     await expect(training.locator('#saved')).toContainText('4735 landmark samples');
     await training.locator('#import').setInputFiles(upload);
     await expect(training.locator('#saved')).toContainText('4735 landmark samples');
-    await training.locator('summary').click();
+    await training.locator('summary').first().click();
     await training.locator('#name').fill('Custom pose');
     await training.locator('#action').selectOption('seek-right');
     await training.locator('#add').click();
@@ -169,6 +183,62 @@ test('packaged camera inference, lifecycle, video routing, and training studio',
     await expect(training.locator('#error')).toContainText('Only empty poses');
     await training.setViewportSize({ width: 390, height: 844 });
     expect(await training.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await training.locator('#connect').click();
+    await expect(training.locator('#connect')).toHaveText('Disconnect camera', { timeout: 30000 });
+    await popup.locator('.options summary').click();
+    await popup.locator('#training-mode').uncheck();
+    await expect(popup.locator('#training')).toBeHidden();
+    await expect(training).toHaveURL(`chrome-extension://${id}/popup.html`);
+    await training.goto(`chrome-extension://${id}/training.html`);
+    await expect(training).toHaveURL(`chrome-extension://${id}/popup.html`);
+    await popup.locator('#training-mode').check();
+    await training.goto(`chrome-extension://${id}/training.html`);
+    await expect(training.locator('#saved')).toContainText('4735 landmark samples');
+    expect(errors).toEqual([]);
+  } finally { await context.close(); await rm(profile, { recursive: true, force: true }); }
+});
+
+test('user-only release omits training files and runs packaged tracking offline', async () => {
+  const root = fileURLToPath(new URL('../../', import.meta.url));
+  execFileSync(process.execPath, ['scripts/build-release.mjs'], { cwd: root });
+  const extension = path.join(root, 'dist/hands-on');
+  for (const file of ['training.html', 'training.js', 'training.css', 'models/training-seed.json', 'models/training-report.json', 'lib/training-data.js', 'setup.html', 'setup.js']) {
+    await expect(access(path.join(extension, file))).rejects.toThrow();
+  }
+  expect(JSON.parse(await readFile(path.join(extension, 'manifest.json'), 'utf8')).name).toBe('Hands On Video Controls');
+  expect(await readFile(path.join(extension, 'popup.html'), 'utf8')).not.toMatch(/training|diagnostics|FPS|ms \/ frame/);
+  const profile = await mkdtemp(path.join(tmpdir(), 'hands-on-release-'));
+  const context = await chromium.launchPersistentContext(profile, {
+    channel: 'chromium', headless: true,
+    ignoreDefaultArgs: ['--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding'],
+    args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`, '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'],
+  });
+  try {
+    let [background] = context.serviceWorkers();
+    background ??= await context.waitForEvent('serviceworker');
+    const id = new URL(background.url()).host;
+    const popup = await context.newPage();
+    const errors = [];
+    context.on('weberror', event => errors.push(event.error().message));
+    await context.setOffline(true);
+    await popup.goto(`chrome-extension://${id}/popup.html`);
+    await expect(popup.locator('#state')).toHaveText('Camera is off');
+    await expect(popup.locator('#training')).toHaveCount(0);
+    await expect(popup.locator('#diagnostics')).toHaveCount(0);
+    await expect(popup.locator('#training-mode')).toHaveCount(0);
+    await expect(popup.locator('#try-skip')).toHaveCount(0);
+    await expect(popup.locator('#setup')).toHaveCount(0);
+    expect(await popup.evaluate(() => chrome.runtime.sendMessage({ target: 'background', action: 'test-skip' }))).toMatchObject({ error: 'Unknown action' });
+    expect(await popup.locator('body').evaluate(body => body.getBoundingClientRect().height)).toBeLessThanOrEqual(600);
+    await popup.locator('body').screenshot({ path: '/private/tmp/hands-on-release.png' });
+    await popup.evaluate(() => chrome.runtime.sendMessage({ target: 'background', action: 'start' }));
+    await expect(popup.locator('#state')).toHaveText('You’re in control', { timeout: 30000 });
+    expect(await popup.locator('body').evaluate(body => body.getBoundingClientRect().height)).toBeLessThanOrEqual(600);
+    await expect.poll(() => popup.evaluate(async () => (await chrome.runtime.sendMessage({ target: 'background', action: 'get-status' })).inferenceMs)).toBeGreaterThan(0);
+    await popup.locator('body').screenshot({ path: '/private/tmp/hands-on-release-running.png' });
+    await popup.locator('#toggle').click();
+    await expect(popup.locator('#state')).toHaveText('Camera is off');
+    expect(await background.evaluate(() => chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] }))).toHaveLength(0);
     expect(errors).toEqual([]);
   } finally { await context.close(); await rm(profile, { recursive: true, force: true }); }
 });

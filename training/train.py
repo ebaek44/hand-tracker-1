@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_LABELS = [
     {"name": "Open palm", "action": "toggle"},
     {"name": "Closed hand", "action": "none"},
-    {"name": "Point up", "action": "none"},
+    {"name": "Point up", "action": "skip-ad"},
     {"name": "Confirm / neutral", "action": "none"},
     {"name": "Point right", "action": "seek-right"},
     {"name": "Point left", "action": "seek-left"},
@@ -36,6 +36,7 @@ def main():
         if dataset.get("schemaVersion") != 1:
             raise ValueError("Unsupported dataset version")
         labels = dataset["labels"]
+        labels = [{**label, "action": "skip-ad"} if label.get("name") == "Point up" and label.get("action") == "none" else label for label in labels]
         samples = dataset["samples"]
     if args.legacy_data or not args.data:
         if labels[:4] != DEFAULT_LABELS[:4]:
@@ -44,7 +45,7 @@ def main():
             samples += [{"label": int(row[0]), "features": list(map(float, row[1:])), "session": "legacy"} for row in csv.reader(source) if int(row[0]) < 4]
     # Studio exports already contain retained legacy rows. Do not weight them twice.
     samples = list({(s["label"], s.get("session", "legacy"), tuple(s["features"])): s for s in samples}.values())
-    if not labels or any(label.get("action") not in ("none", "toggle", "seek-left", "seek-right") for label in labels):
+    if not labels or any(label.get("action") not in ("none", "toggle", "seek-left", "seek-right", "skip-ad") for label in labels):
         raise ValueError("Labels need a name and one supported action")
     x = np.asarray([s["features"] for s in samples], dtype=np.float32)
     y = np.asarray([s["label"] for s in samples], dtype=np.int32)

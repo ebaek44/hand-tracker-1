@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { predict, normalizeLandmarks, HoldGestureEngine } from '../extension/lib/gestures.js';
-import { withRetainedExamples } from '../extension/lib/training-data.js';
+import { withRetainedExamples, upgradePointUpAction } from '../extension/lib/training-data.js';
 const json = path => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'));
 const original = json('../extension/models/classifiers.json');
 const fixtures = json('./fixtures/classifier-parity.json');
@@ -84,4 +84,22 @@ test('missing/uncertain hands never emit actions or carry stale dwell', () => {
   sample(engine, 'none', 350, 1000);
   assert.equal(sample(engine, 'toggle', 1050, 1350).length, 0);
   assert.equal(engine.update('toggle', 1450)?.type, 'control');
+});
+test('skip-ad needs a deliberate hold, fires once, and rearms after release', () => {
+  const engine = new HoldGestureEngine();
+  assert.equal(sample(engine, 'skip-ad', 0, 550).length, 0);
+  const events = sample(engine, 'skip-ad', 600, 5000);
+  assert.deepEqual(events, [{ time: 600, type: 'control', value: 'skip_ad' }]);
+  sample(engine, 'none', 5050, 5150);
+  assert.equal(sample(engine, 'skip-ad', 5200, 6000).length, 0);
+  sample(engine, 'none', 6050, 6300);
+  assert.equal(sample(engine, 'skip-ad', 6350, 7000).length, 1);
+});
+test('old datasets gain the requested point-up action without changing recorded samples', () => {
+  const dataset = { labels: [{ name: 'Point up', action: 'none' }, { name: 'Closed hand', action: 'none' }], samples: [{ label: 0, features: [1,2], session: 'recorded' }] };
+  const updated = upgradePointUpAction(dataset);
+  assert.equal(updated.labels[0].action, 'skip-ad');
+  assert.equal(updated.labels[1].action, 'none');
+  assert.equal(updated.samples, dataset.samples);
+  assert.equal(dataset.labels[0].action, 'none');
 });

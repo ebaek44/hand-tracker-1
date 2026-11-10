@@ -4,7 +4,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 const root = new URL('../', import.meta.url);
 const labels = [
   { name: 'Open palm', action: 'toggle' }, { name: 'Closed hand', action: 'none' },
-  { name: 'Point up', action: 'none' }, { name: 'Confirm / neutral', action: 'none' },
+  { name: 'Point up', action: 'skip-ad' }, { name: 'Confirm / neutral', action: 'none' },
 ];
 const original = JSON.parse(await readFile(new URL('extension/models/classifiers.json', root), 'utf8')).keypoint;
 const rows = (await readFile(new URL('hand_tracker/model/keypoint_classifier/keypoint.csv', root), 'utf8')).trim().split(/\r?\n/).map(row => row.split(',').map(Number));

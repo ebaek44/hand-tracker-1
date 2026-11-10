@@ -46,12 +46,15 @@ export class HoldGestureEngine {
     this.releaseSince = null;
     this.lastToggle = -Infinity;
     this.lastSeek = -Infinity;
+    this.skipLatched = false;
+    this.skipReleaseSince = null;
   }
   update(action, time) {
     if (this.lastFrame !== null && time - this.lastFrame > 600) {
       this.action = 'none';
       this.since = null;
       this.releaseSince = null;
+      this.skipReleaseSince = null;
     }
     this.lastFrame = time;
     if (action !== this.action || this.since === null) {
@@ -62,6 +65,14 @@ export class HoldGestureEngine {
       this.releaseSince ??= time;
       if (time - this.releaseSince >= 180) this.toggleLatched = false;
     } else this.releaseSince = null;
+    if (action !== 'skip-ad') {
+      this.skipReleaseSince ??= time;
+      if (time - this.skipReleaseSince >= 180) this.skipLatched = false;
+    } else this.skipReleaseSince = null;
+    if (action === 'skip-ad' && !this.skipLatched && time - this.since >= 600) {
+      this.skipLatched = true;
+      return { type: 'control', value: 'skip_ad' };
+    }
     if (action === 'toggle' && !this.toggleLatched && time - this.since >= 400 && time - this.lastToggle >= 1000) {
       this.toggleLatched = true;
       this.lastToggle = time;

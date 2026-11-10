@@ -1,14 +1,30 @@
 {
   "manifest_version": 3,
   "minimum_chrome_version": "116",
-  "name": "Hands On Video Controls",
-  "version": "2.0.0",
-  "description": "Control browser videos with on-device hand tracking. No Python helper or server required.",
-  "icons": { "128": "icon128.png" },
-  "permissions": ["offscreen", "scripting"],
-  "host_permissions": ["http://*/*", "https://*/*"],
-  "action": { "default_popup": "popup.html", "default_title": "Hands On Video Controls" },
-  "background": { "service_worker": "background.js", "type": "module" },
+  "name": "Hands On Video Controls (Studio)",
+  "version": "2.1.1",
+  "description": "Hands-free play, pause, seeking, and optional YouTube ad skipping. Camera processing stays on your device.",
+  "icons": {
+    "128": "icon128.png"
+  },
+  "permissions": [
+    "offscreen",
+    "scripting",
+    "storage",
+    "debugger"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Hands On Video Controls"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self'; worker-src 'self';"
   }

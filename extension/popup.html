@@ -3,24 +3,28 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Hands On</title><link rel="stylesheet" href="styles.css"></head>
 <body class="popup">
   <main>
-    <div class="eyebrow">ON-DEVICE VIDEO CONTROLS</div>
+    <header class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="m9 7 8 5-8 5V7Z" fill="currentColor"/></svg></span><span class="eyebrow">HANDS-FREE VIDEO</span></header>
     <h1>Hands On<span>.</span></h1>
-    <p class="intro">A little movement. Full control.</p>
+    <p class="intro">Your video. At your fingertips.</p>
     <section class="status-card" aria-label="Tracking status">
       <div class="status-line"><span id="dot" class="dot"></span><strong id="state" role="status">Checking status…</strong></div>
-      <p id="detail">Your camera stays on your device.</p>
-      <div id="metrics" class="metrics" hidden><span><b id="fps">—</b> FPS</span><span><b id="latency">—</b> ms / frame</span></div>
+      <p id="detail">Ready when you are.</p>
+      <!-- authoring:start -->
+      <details id="diagnostics" class="diagnostics" hidden><summary>Tracking details</summary><div id="metrics" class="metrics"><span><b id="fps">—</b> FPS</span><span><b id="latency">—</b> ms / frame</span></div></details>
+      <!-- authoring:end -->
     </section>
     <p id="error" class="error" role="alert" hidden></p>
-    <p id="training-note" class="hint" hidden></p>
     <button id="toggle" class="primary" disabled>Start tracking</button>
-    <div class="section-label">YOUR GESTURES</div>
+    <div class="section-label">A FEW SIMPLE GESTURES</div>
     <dl class="gestures">
-      <div><dt>Open palm <small>Hold for 0.4 seconds</small></dt><dd>Play / pause</dd></div>
-      <div><dt>Point left / right <small>Hold to repeat</small></dt><dd>±10s / second</dd></div>
+      <div><span class="gesture-symbol" aria-hidden="true">Ⅱ / ▷</span><dt>Open palm <small>Hold briefly, then relax</small></dt><dd>Play / pause</dd></div>
+      <div><span class="gesture-symbol" aria-hidden="true">← →</span><dt>Point left or right <small>Hold to keep moving</small></dt><dd>±10 seconds</dd></div>
+      <div><span class="gesture-symbol" aria-hidden="true">↑</span><dt>Point up <small id="skip-hint">Enable in Options</small></dt><dd>Skip ad <small>YouTube</small></dd></div>
     </dl>
-    <p class="hint">Hold a direction to seek; lower your hand to stop. Only the active video tab responds.</p>
-    <footer><button id="setup" class="text-button">Camera setup</button><button id="training" class="text-button">Training studio</button></footer>
+    <p class="hint">Lower your hand to stop seeking. Controls follow your active video tab.</p>
+    <details class="options"><summary>Options <span id="app-version"></span></summary><label class="option-row" for="ad-skipping"><span>YouTube ad skipping</span><input id="ad-skipping" type="checkbox" role="switch" disabled></label><p class="option-help">Off by default. When enabled, uses Chrome’s debugger permission to press the visible Skip ad button. Chrome may show a debugging notice.</p><p id="ad-option-status" class="option-help" role="status" hidden></p><!-- authoring:start --><label class="option-row" for="training-mode"><span>Training studio</span><input id="training-mode" type="checkbox" role="switch" disabled></label><p class="option-help">Show gesture recording tools and tracking details. Your recordings stay saved when this is off.</p><!-- authoring:end --></details>
+    <footer><span class="privacy"><span aria-hidden="true">●</span> Camera stays on your device</span></footer>
+    <!-- authoring:start --><div class="authoring-tools"><button id="training" class="text-button" hidden>Training studio</button></div><!-- authoring:end -->
   </main>
   <script src="popup.js" type="module"></script>
 </body></html>

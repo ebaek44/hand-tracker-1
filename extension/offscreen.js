@@ -28,7 +28,7 @@ function fail(error) {
   cleanup();
   const cameraError = ['NotAllowedError', 'PermissionDeniedError', 'SecurityError'].includes(error.name);
   publish({ state: 'error', needsPermission: cameraError, error: cameraError
-    ? 'Allow camera access in Camera setup, then start tracking again.'
+    ? 'Allow Hands On in Chrome’s camera settings and your system privacy settings, then start tracking again.'
     : error.name === 'NotReadableError' ? 'The camera is busy. Close other camera apps and try again.'
     : error.name === 'NotFoundError' ? 'No camera found. Connect a camera and try again.'
     : error.message || 'Tracking stopped unexpectedly.' });
@@ -74,7 +74,7 @@ async function start() {
         if (data.observation) Object.assign(status, data.observation);
         status.inferenceMs = Math.round(averageMs);
         if (data.event) {
-          status.lastGesture = data.event.type === 'control' ? 'Play / pause' : `Seek ${data.event.value === 'right' ? '+10' : '−10'} seconds`;
+          status.lastGesture = data.event.type === 'control' ? data.event.value === 'skip_ad' ? 'Skip ad' : 'Play / pause' : `Seek ${data.event.value === 'right' ? '+10' : '−10'} seconds`;
           void chrome.runtime.sendMessage({ target: 'background', action: 'gesture', payload: data.event });
         }
         if (performance.now() - lastStatusAt >= 1000 || data.event) {
@@ -118,7 +118,10 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   else if (message.action === 'start') { void start(); respond(status); }
   else if (message.action === 'stop') { cleanup(); publish({ state: 'stopped' }); respond(status); }
   else if (message.action === 'feedback') {
-    status.feedback = message.feedback?.ok ? 'Video controlled' : message.feedback?.error || 'No video available';
+    status.feedback = message.feedback?.ok ? message.feedback.message || 'Video controlled' : message.feedback?.error || 'No video available';
+    status.feedbackAction = message.feedback?.action;
+    status.feedbackAt = Date.now();
+    status.skipResult = message.feedback?.action === 'skip_ad' ? message.feedback.code : undefined;
     respond({ ok: true });
   }
 });

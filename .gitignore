@@ -23,3 +23,6 @@ pnpm-lock.yaml
 .DS_Store
 .idea/
 .vscode/
+
+# Retired native backend bundle: keep on this computer only
+/gesture-server-macos-arm64.zip

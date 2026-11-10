@@ -1,10 +1,12 @@
 {
   "name": "hands-on-video-controls",
-  "version": "2.0.0",
+  "version": "2.1.1",
   "private": true,
   "type": "module",
   "scripts": {
     "prepare:extension": "node scripts/prepare-extension.mjs",
+    "build:release": "node scripts/build-release.mjs",
+    "package:release": "npm run build:release && node scripts/package-release.mjs",
     "reset:training-baseline": "node scripts/reset-training-baseline.mjs",
     "test": "node --test tests/*.test.mjs",
     "test:browser": "playwright test",
